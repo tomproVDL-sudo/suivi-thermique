@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <link rel="manifest" href="manifest.json">  
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e293b">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suivi Thermique - Connecté</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -32,7 +33,7 @@
                             ☰
                         </button>
                         <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-2 z-30 text-sm">
-                            <button @click="exportToExcel; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                            <button @click="exportToExcel(); menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
                                 📥 Exporter Excel
                             </button>
                             <button @click="openGestionEtablissements" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
@@ -235,6 +236,23 @@
         </main>
     </div>
 
+    <!-- Gestion de version anti-cache -->
+    <script>
+        const APP_VERSION = '1.0.1'; // CHANGEZ ce numéro à chaque mise à jour
+        const currentVersion = localStorage.getItem('app_version');
+        if (currentVersion !== APP_VERSION) {
+            localStorage.setItem('app_version', APP_VERSION);
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(reg => reg.unregister());
+                });
+            }
+            localStorage.removeItem('mesures_db_v6');
+            localStorage.removeItem('etablissements_data');
+            window.location.reload();
+        }
+    </script>
+
     <script>
         const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
@@ -248,7 +266,6 @@
 
         createApp({
             setup() {
-                // ---- État existant ----
                 const isOnline = ref(navigator.onLine);
                 const isCloudActive = computed(() => isOnline.value && supabaseClient !== null);
                 const parametresAirAffiches = ref(['tAir', 'wbgt']);
@@ -284,11 +301,10 @@
                     return val < 900 || val > 1100;
                 });
 
-                // ---- Nouveaux : gestion établissements/points ----
+                // ---- Gestion établissements/points ----
                 const menuOpen = ref(false);
                 const showGestion = ref(false);
                 
-                // Structure par défaut (les deux existants)
                 const etablissementsDefaut = [
                     { 
                         nom: 'Thierry Launay',
@@ -310,14 +326,13 @@
 
                 const etablissementsData = ref(JSON.parse(JSON.stringify(etablissementsDefaut)));
 
-                // Charger depuis Supabase
                 const loadEtablissementsCloud = async () => {
                     if (!isCloudActive.value) return;
                     const { data, error } = await supabaseClient
                         .from('etablissements')
                         .select('data')
                         .eq('id', 1)
-                        .single();
+                        .maybeSingle();
                     if (error) {
                         console.error('Erreur chargement etablissements:', error);
                         return;
@@ -328,7 +343,6 @@
                     }
                 };
 
-                // Sauvegarder dans Supabase
                 const saveEtablissementsCloud = async () => {
                     if (!isCloudActive.value) return;
                     const payload = { id: 1, data: etablissementsData.value };
@@ -349,7 +363,6 @@
                     } else {
                         etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut));
                     }
-                    // Tenter de récupérer la version cloud
                     if (isCloudActive.value) loadEtablissementsCloud();
                 };
                 
@@ -372,7 +385,6 @@
                     return etab ? etab.points : [];
                 });
 
-                // Dates de campagnes (issues des mesures locales)
                 const datesCampagne = computed(() => {
                     const dates = new Set();
                     [...db.value.surface, ...db.value.air].forEach(m => {
@@ -381,26 +393,15 @@
                     return Array.from(dates).sort();
                 });
 
-                const ajouterEtablissement = () => {
-                    etablissementsData.value.push({ nom: '', points: [] });
-                };
+                const ajouterEtablissement = () => etablissementsData.value.push({ nom: '', points: [] });
                 const supprimerEtablissement = (index) => {
-                    if (confirm("Supprimer cet établissement et tous ses points ?")) {
-                        etablissementsData.value.splice(index, 1);
-                    }
+                    if (confirm("Supprimer cet établissement et tous ses points ?")) etablissementsData.value.splice(index, 1);
                 };
-                const ajouterPoint = (indexEtab) => {
-                    etablissementsData.value[indexEtab].points.push({ id: '', localisation: '' });
-                };
-                const supprimerPoint = (indexEtab, indexPoint) => {
-                    etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
-                };
-                const openGestionEtablissements = () => {
-                    menuOpen.value = false;
-                    showGestion.value = true;
-                };
+                const ajouterPoint = (indexEtab) => etablissementsData.value[indexEtab].points.push({ id: '', localisation: '' });
+                const supprimerPoint = (indexEtab, indexPoint) => etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
+                const openGestionEtablissements = () => { menuOpen.value = false; showGestion.value = true; };
 
-                // ---- Reprise des fonctions existantes ----
+                // ---- Fonctions existantes ----
                 const pointHistorique = computed(() => {
                     if (!form.value.point) return [];
                     let hist = db.value[activeTab.value].filter(m => m.point === form.value.point && m.etablissement === etablissement.value && m.date === dateCampagne.value);
@@ -436,9 +437,7 @@
                 };
 
                 const exportToExcel = async () => {
-                    if (isCloudActive.value) {
-                        await loadCloudData();
-                    }
+                    if (isCloudActive.value) await loadCloudData();
                     
                     const surfaceData = db.value.surface.map(m => ({
                         'ID': m.id,
@@ -706,8 +705,7 @@
                     window.addEventListener('online', () => { isOnline.value = true; loadCloudData(); });
                     window.addEventListener('offline', () => { isOnline.value = false; });
                     
-                    if (isOnline.value) loadCloudData();
-                    if (isOnline.value) loadEtablissementsCloud();
+                    if (isOnline.value) { loadCloudData(); loadEtablissementsCloud(); }
                 });
 
                 return { 
@@ -716,7 +714,6 @@
                     parametresAirAffiches, listeParametresAir, pressionInvalide, exportToExcel,
                     switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
                     updateChart, onEtablissementChange, loadCloudData,
-                    // nouveaux
                     menuOpen, showGestion, etablissementsData, listeEtablissements,
                     datesCampagne,
                     openGestionEtablissements, sauvegarderEtablissements,
@@ -727,27 +724,23 @@
         }).mount('#app');
     </script>
 
+    <!-- Service worker avec auto-update -->
     <script>
     if ('serviceWorker' in navigator) {
-        // Enregistrer le service worker
         navigator.serviceWorker.register('/suivi-thermique/sw.js')
             .then(registration => {
-                // Vérifier s'il y a une mise à jour et l'appliquer automatiquement
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // Nouvelle version disponible : recharger la page
                             window.location.reload();
                         }
                     });
                 });
-    
-                // Forcer une vérification de mise à jour au chargement
                 registration.update();
             })
             .catch(() => {});
     }
     </script>
-</body> 
+</body>
 </html>
