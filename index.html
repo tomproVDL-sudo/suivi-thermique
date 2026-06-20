@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <link rel="manifest" href="manifest.json">    
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Suivi%20Thermique%22%2C%22short_name%22%3A%22Thermique%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%231e293b%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%253Ccircle%20cx%3D'50'%20cy%3D'50'%20r%3D'45'%20fill%3D'%23f97316'%2F%3E%253Ctext%20x%3D'50'%20y%3D'65'%20font-size%3D'40'%20text-anchor%3D'middle'%20fill%3D'white'%20font-family%3D'sans-serif'%3E%25C2%25B0C%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
     <meta name="theme-color" content="#1e293b">
-    <!-- iOS meta -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta charset="UTF-8">
@@ -13,21 +12,38 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans antialiased">
 
     <div id="app" class="max-w-4xl mx-auto bg-white min-h-screen shadow-xl pb-10">
         
         <header class="bg-slate-800 text-white p-4 sticky top-0 z-20 shadow-md">
-            <div class="mb-4 flex justify-between items-center">
+            <div class="flex justify-between items-center">
                 <h1 class="text-xl font-bold">Mesures Environnementales</h1>
-                <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-2" title="Indique si la connexion à Supabase est établie">
-                    <span class="w-2 h-2 rounded-full animate-pulse" :class="isCloudActive ? 'bg-green-400' : 'bg-red-400'"></span>
-                    {{ isCloudActive ? 'CONNEXION CLOUD OK' : 'MODE LOCAL' }}
+                <div class="flex items-center gap-3">
+                    <!-- Indicateur de connexion -->
+                    <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full animate-pulse" :class="isCloudActive ? 'bg-green-400' : 'bg-red-400'"></span>
+                        <span class="hidden sm:inline">{{ isCloudActive ? 'CONNEXION CLOUD' : 'MODE LOCAL' }}</span>
+                    </div>
+                    <!-- Menu hamburger -->
+                    <div class="relative">
+                        <button @click="menuOpen = !menuOpen" class="text-white hover:text-gray-300 focus:outline-none">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </button>
+                        <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg py-1 z-30">
+                            <button @click="exportToExcel(); menuOpen = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
+                                📥 Exporter Excel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-3 mt-4">
                 <div class="bg-slate-700 p-2 rounded-lg flex flex-col border border-slate-600">
                     <label class="text-xs font-bold text-gray-400 mb-1">Établissement</label>
                     <select v-model="etablissement" @change="onEtablissementChange" class="w-full bg-slate-800 text-white p-1.5 rounded focus:ring-2 focus:ring-blue-500 border-none text-sm font-bold">
@@ -78,8 +94,6 @@
                             <div><label class="block text-xs font-bold text-gray-700 mb-1">Vent</label><select v-model="form.vent" class="w-full p-2 text-sm border rounded bg-white"><option>Absent</option><option>Un peu</option><option>Moyen</option><option>Complément</option></select></div>
                         </div>
 
-                                           
-
                         <div v-if="activeTab === 'surface'" class="space-y-3">
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">T° Surface (°C)</label><input v-model="form.tSurface" type="number" step="0.1" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
                             <div>
@@ -90,16 +104,13 @@
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label><input v-model="form.remarques" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
                         </div>
 
-                        
                         <div v-if="activeTab === 'air'" class="space-y-3">
-                            <!-- Remarques (inchangé) -->
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label>
                                 <input v-model="form.remarques" type="text" 
                                     class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
 
-                            <!-- NOUVEAU : N° Capteur et N° Enregistrement AVANT les mesures -->
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-700">N° Capteur</label>
@@ -113,36 +124,14 @@
                                 </div>
                             </div>
 
-                            <!-- Bloc des mesures (T° Air, WBGT, etc.) qui était avant, maintenant après -->
                             <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <label class="font-bold text-gray-700">T° Air (°C)</label>
-                                    <input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">WBGT (°C)</label>
-                                    <input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">WB (°C)</label>
-                                    <input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">HI (°C)</label>
-                                    <input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">HR (%)</label>
-                                    <input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">GT (°C)</label>
-                                    <input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="font-bold text-gray-700">DPT (°C)</label>
-                                    <input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded">
-                                </div>
+                                <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">WBGT (°C)</label><input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">WB (°C)</label><input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">HI (°C)</label><input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">HR (%)</label><input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">GT (°C)</label><input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">DPT (°C)</label><input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div>
                                     <label class="font-bold text-gray-700">Pression (Pa)</label>
                                     <input v-model.number="form.pression" type="number" step="0.1" min="900" max="1100"
@@ -165,25 +154,19 @@
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                         <h3 class="text-xs font-bold text-gray-500 mb-2 text-center uppercase">Point {{ form.point || '?' }}</h3>
                         
-                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                            <h3 class="text-xs font-bold text-gray-500 mb-2 text-center uppercase">Point {{ form.point || '?' }}</h3>
-                            
-                            <!-- Checkboxes pour sélectionner les paramètres à afficher -->
-                            <div v-if="activeTab === 'air' && form.point" class="flex flex-wrap gap-2 mb-3 justify-center">
-                                <label v-for="param in listeParametresAir" :key="param.key" class="flex items-center gap-1 text-xs font-medium cursor-pointer">
-                                    <input type="checkbox" :value="param.key" v-model="parametresAirAffiches" @change="updateChart" class="rounded">
-                                    <span :style="{ color: param.couleur }">{{ param.label }}</span>
-                                </label>
-                            </div>
-
-                            <div v-show="form.point" class="relative h-64 w-full">
-                                <canvas id="myChart"></canvas>
-                            </div>
-                            <div v-if="!form.point" class="h-64 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed rounded-lg">
-                                Sélectionnez un point
-                            </div>
+                        <div v-if="activeTab === 'air' && form.point" class="flex flex-wrap gap-2 mb-3 justify-center">
+                            <label v-for="param in listeParametresAir" :key="param.key" class="flex items-center gap-1 text-xs font-medium cursor-pointer">
+                                <input type="checkbox" :value="param.key" v-model="parametresAirAffiches" @change="updateChart" class="rounded">
+                                <span :style="{ color: param.couleur }">{{ param.label }}</span>
+                            </label>
                         </div>
 
+                        <div v-show="form.point" class="relative h-64 w-full">
+                            <canvas id="myChart"></canvas>
+                        </div>
+                        <div v-if="!form.point" class="h-64 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed rounded-lg">
+                            Sélectionnez un point
+                        </div>
                     </div>
 
                     <div v-if="form.point && pointHistorique.length > 0" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -208,7 +191,6 @@
                         </ul>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
@@ -228,9 +210,9 @@
             setup() {
                 const isOnline = ref(navigator.onLine);
                 const isCloudActive = computed(() => isOnline.value && supabaseClient !== null);
+                const menuOpen = ref(false);
                 const parametresAirAffiches = ref(['tAir', 'wbgt']);
 
-                // Liste complète des paramètres d'air avec leur clé, label et couleur
                 const listeParametresAir = [
                     { key: 'tAir', label: 'T° Air', couleur: '#3b82f6' },
                     { key: 'wbgt', label: 'WBGT', couleur: '#8b5cf6' },
@@ -256,14 +238,11 @@
                 const form = ref({ ...baseForm });
                 const editingId = ref(null); 
 
-                // Propriété calculée pour vérifier la pression
                 const pressionInvalide = computed(() => {
-                    // Si le champ est vide ou NaN, on ne considère pas comme invalide (l'utilisateur n'a pas fini)
                     if (form.value.pression === '' || form.value.pression === null || isNaN(form.value.pression)) return false;
                     const val = parseFloat(form.value.pression);
                     return val < 900 || val > 1100;
                 });
-
 
                 const pointsDisponibles = computed(() => etablissement.value === 'Thierry Launay' ? ['1','2','3','3bis','4','5','6','7','8','9'] : ['1','2','3','4','5','6']);
 
@@ -301,6 +280,68 @@
                     }
                 };
 
+                const exportToExcel = async () => {
+                    if (isCloudActive.value) {
+                        await loadCloudData();
+                    }
+                    
+                    const surfaceData = db.value.surface.map(m => ({
+                        'ID': m.id,
+                        'Date': m.date,
+                        'Heure': m.heure,
+                        'Établissement': m.etablissement,
+                        'Point': m.point,
+                        'Nuage': m.nuage,
+                        'Ombre': m.ombre,
+                        'Vent': m.vent,
+                        'Remarques': m.remarques,
+                        'T° Surface (°C)': m.tSurface,
+                        'N° Photo': m.numPhoto
+                    }));
+
+                    const airData = db.value.air.map(m => ({
+                        'ID': m.id,
+                        'Date': m.date,
+                        'Heure': m.heure,
+                        'Établissement': m.etablissement,
+                        'Point': m.point,
+                        'Nuage': m.nuage,
+                        'Ombre': m.ombre,
+                        'Vent': m.vent,
+                        'Remarques': m.remarques,
+                        'T° Air (°C)': m.tAir,
+                        'WBGT (°C)': m.wbgt,
+                        'WB (°C)': m.wb,
+                        'HI (°C)': m.hi,
+                        'HR (%)': m.hr,
+                        'GT (°C)': m.gt,
+                        'DPT (°C)': m.dpt,
+                        'Pression (Pa)': m.pression,
+                        'N° Capteur': m.numCapteur,
+                        'N° Enregistrement': m.numEnregAir
+                    }));
+
+                    const wb = XLSX.utils.book_new();
+                    
+                    if (surfaceData.length > 0) {
+                        const wsSurface = XLSX.utils.json_to_sheet(surfaceData);
+                        XLSX.utils.book_append_sheet(wb, wsSurface, "Surface");
+                    }
+                    
+                    if (airData.length > 0) {
+                        const wsAir = XLSX.utils.json_to_sheet(airData);
+                        XLSX.utils.book_append_sheet(wb, wsAir, "Air");
+                    }
+                    
+                    if (surfaceData.length === 0 && airData.length === 0) {
+                        alert("Aucune donnée à exporter.");
+                        return;
+                    }
+                    
+                    const dateStr = new Date().toISOString().slice(0,10);
+                    XLSX.writeFile(wb, `suivi_thermique_${dateStr}.xlsx`);
+                };
+
                 const onEtablissementChange = () => { localStorage.setItem('etablissement_pref', etablissement.value); form.value.point = ''; cancelEdit(); updateChart(); };
                 const switchTab = async (tab) => { activeTab.value = tab; const p = form.value.point; form.value = { ...baseForm, point: p }; cancelEdit(); await nextTick(); updateChart(); };
                 const editMesure = (mesure) => { form.value = { ...mesure }; editingId.value = mesure.id; window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -319,7 +360,6 @@
                     }
                 };
 
-                // Fonction repensée pour ne générer QUE les données correspondantes à la table visée
                 const buildPayloadForDB = () => {
                     let payload = {
                         id: editingId.value || Date.now().toString(),
@@ -333,11 +373,10 @@
                         remarques: form.value.remarques
                     };
 
-                        if (activeTab.value === 'surface') {
-                            payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
-                            // numPhoto : garder en nombre, null si vide ou non-numérique
-                            payload.numPhoto = (form.value.numPhoto !== '' && !isNaN(form.value.numPhoto)) ? Number(form.value.numPhoto) : null;
-                        } else {
+                    if (activeTab.value === 'surface') {
+                        payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
+                        payload.numPhoto = (form.value.numPhoto !== '' && !isNaN(form.value.numPhoto)) ? Number(form.value.numPhoto) : null;
+                    } else {
                         payload.tAir = form.value.tAir === "" ? null : parseFloat(form.value.tAir);
                         payload.wbgt = form.value.wbgt === "" ? null : parseFloat(form.value.wbgt);
                         payload.wb = form.value.wb === "" ? null : parseFloat(form.value.wb);
@@ -353,17 +392,15 @@
                 };
 
                 const saveMesure = async () => {
-                    
                     if (activeTab.value === 'air' && pressionInvalide.value) {
                         alert("La pression atmosphérique est invalide. Veuillez entrer une valeur entre 900 et 1100 Pa.");
-                        return; // stoppe l'envoi
+                        return;
                     }
                     isLoading.value = true;
                     
                     let payload = buildPayloadForDB();
                     let cloudSuccess = false;
 
-                    // Vérification de la connexion Supabase
                     if (isCloudActive.value) {
                         console.log('Tentative d\'envoi vers Supabase...');
                         console.log('Payload:', payload);
@@ -377,21 +414,17 @@
                                 .from(table)
                                 .update(payload)
                                 .eq('id', editingId.value)
-                                .select(); // Ajout de .select() pour voir la réponse
+                                .select();
                             
                             if (error) {
                                 console.error('Erreur Supabase UPDATE:', error);
-                                console.error('Code:', error.code);
-                                console.error('Message:', error.message);
-                                console.error('Détails:', error.details);
-                                alert("⚠️ Erreur Supabase (Modification) :\nCode: " + error.code + "\nMessage: " + error.message + "\n\nVérifiez les politiques RLS dans Supabase.");
+                                alert("⚠️ Erreur Supabase (Modification) :\nCode: " + error.code + "\nMessage: " + error.message);
                             } else {
                                 cloudSuccess = true;
                                 console.log('UPDATE réussi, réponse:', data);
                             }
                         }
                         
-                        // Mise à jour locale
                         const index = db.value[activeTab.value].findIndex(m => m.id === editingId.value);
                         if (index !== -1) {
                             db.value[activeTab.value][index] = { ...db.value[activeTab.value][index], ...payload };
@@ -408,14 +441,11 @@
                             const { data, error } = await supabaseClient
                                 .from(table)
                                 .insert([payload])
-                                .select(); // Ajout de .select() pour voir la réponse
+                                .select();
                             
                             if (error) {
                                 console.error('Erreur Supabase INSERT:', error);
-                                console.error('Code:', error.code);
-                                console.error('Message:', error.message);
-                                console.error('Détails:', error.details);
-                                alert("⚠️ Erreur Supabase (Création) :\nCode: " + error.code + "\nMessage: " + error.message + "\n\nCauses possibles:\n- Politique RLS manquante\n- Colonne inexistante\n- Type de données incorrect");
+                                alert("⚠️ Erreur Supabase (Création) :\nCode: " + error.code + "\nMessage: " + error.message);
                             } else {
                                 cloudSuccess = true;
                                 console.log('INSERT réussi, réponse:', data);
@@ -445,7 +475,6 @@
                     if (chartInstance) chartInstance.destroy();
                     
                     if (activeTab.value === 'surface') {
-                        // Surface : une seule courbe
                         chartInstance = new Chart(ctx, {
                             type: 'line',
                             data: {
@@ -464,7 +493,6 @@
                             }
                         });
                     } else {
-                        // Air : plusieurs courbes selon la sélection
                         const datasets = [];
                         for (const param of listeParametresAir) {
                             if (parametresAirAffiches.value.includes(param.key)) {
@@ -479,7 +507,6 @@
                             }
                         }
                         
-                        // Si aucun paramètre sélectionné, ne rien afficher
                         if (datasets.length === 0) {
                             chartInstance = null;
                             return;
@@ -512,16 +539,21 @@
                     if (isOnline.value) loadCloudData();
                 });
 
-                return { activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, pointHistorique, editingId, isCloudActive, isLoading, parametresAirAffiches, listeParametresAir, pressionInvalide, switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, updateChart, onEtablissementChange, loadCloudData };
+                return { 
+                    activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, 
+                    pointHistorique, editingId, isCloudActive, isLoading, 
+                    parametresAirAffiches, listeParametresAir, pressionInvalide, menuOpen, exportToExcel,
+                    switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
+                    updateChart, onEtablissementChange, loadCloudData 
+                };
             }
         }).mount('#app');
     </script>
 
     <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/suivi-thermique/sw.js').catch(() => {});
     }
     </script>
-
 </body>
 </html>
