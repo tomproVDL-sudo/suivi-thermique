@@ -78,27 +78,80 @@
                             <div><label class="block text-xs font-bold text-gray-700 mb-1">Vent</label><select v-model="form.vent" class="w-full p-2 text-sm border rounded bg-white"><option>Absent</option><option>Un peu</option><option>Moyen</option><option>Complément</option></select></div>
                         </div>
 
+                                           
+
                         <div v-if="activeTab === 'surface'" class="space-y-3">
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">T° Surface (°C)</label><input v-model="form.tSurface" type="number" step="0.1" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
-                            <div><label class="block text-sm font-bold text-gray-700 mb-1">N° Photo</label><input v-model="form.numPhoto" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">N° Photo</label>
+                                <input v-model.number="form.numPhoto" type="number" step="1" min="0" 
+                                    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500">
+                            </div>                           
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label><input v-model="form.remarques" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
                         </div>
 
+                        
                         <div v-if="activeTab === 'air'" class="space-y-3">
-                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label><input v-model="form.remarques" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"></div>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">WBGT (°C)</label><input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">WB (°C)</label><input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">HI (°C)</label><input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">HR (%)</label><input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">GT (°C)</label><input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">DPT (°C)</label><input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">Pression (Pa)</label><input v-model="form.pression" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                            <!-- Remarques (inchangé) -->
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label>
+                                <input v-model="form.remarques" type="text" 
+                                    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
+
+                            <!-- NOUVEAU : N° Capteur et N° Enregistrement AVANT les mesures -->
                             <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-xs font-bold text-gray-700">N° Capteur</label><input v-model="form.numCapteur" type="text" class="w-full p-2 border rounded"></div>
-                                <div><label class="block text-xs font-bold text-gray-700">N° Enregistrement</label><input v-model="form.numEnregAir" type="text" class="w-full p-2 border rounded"></div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700">N° Capteur</label>
+                                    <input v-model.number="form.numCapteur" type="number" step="1" min="0"
+                                        class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700">N° Enregistrement</label>
+                                    <input v-model.number="form.numEnregAir" type="number" step="1" min="0"
+                                        class="w-full p-2 border rounded">
+                                </div>
+                            </div>
+
+                            <!-- Bloc des mesures (T° Air, WBGT, etc.) qui était avant, maintenant après -->
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                    <label class="font-bold text-gray-700">T° Air (°C)</label>
+                                    <input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">WBGT (°C)</label>
+                                    <input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">WB (°C)</label>
+                                    <input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">HI (°C)</label>
+                                    <input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">HR (%)</label>
+                                    <input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">GT (°C)</label>
+                                    <input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">DPT (°C)</label>
+                                    <input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="font-bold text-gray-700">Pression (Pa)</label>
+                                    <input v-model.number="form.pression" type="number" step="0.1" min="900" max="1100"
+                                        class="w-full p-2 border rounded"
+                                        :class="{ 'border-red-500 bg-red-50': pressionInvalide }">
+                                    <p v-if="pressionInvalide" class="text-red-600 text-xs mt-1">
+                                        La pression doit être comprise entre 900 et 1100 Pa.
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -130,11 +183,7 @@
                                 Sélectionnez un point
                             </div>
                         </div>
-                        
-                        
-                        
-                        <div v-show="form.point" class="relative h-64 w-full"><canvas id="myChart"></canvas></div>
-                        <div v-if="!form.point" class="h-64 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed rounded-lg">Sélectionnez un point</div>
+
                     </div>
 
                     <div v-if="form.point && pointHistorique.length > 0" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -207,6 +256,15 @@
                 const form = ref({ ...baseForm });
                 const editingId = ref(null); 
 
+                // Propriété calculée pour vérifier la pression
+                const pressionInvalide = computed(() => {
+                    // Si le champ est vide ou NaN, on ne considère pas comme invalide (l'utilisateur n'a pas fini)
+                    if (form.value.pression === '' || form.value.pression === null || isNaN(form.value.pression)) return false;
+                    const val = parseFloat(form.value.pression);
+                    return val < 900 || val > 1100;
+                });
+
+
                 const pointsDisponibles = computed(() => etablissement.value === 'Thierry Launay' ? ['1','2','3','3bis','4','5','6','7','8','9'] : ['1','2','3','4','5','6']);
 
                 const pointHistorique = computed(() => {
@@ -275,10 +333,11 @@
                         remarques: form.value.remarques
                     };
 
-                    if (activeTab.value === 'surface') {
-                        payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
-                        payload.numPhoto = form.value.numPhoto;
-                    } else {
+                        if (activeTab.value === 'surface') {
+                            payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
+                            // numPhoto : garder en nombre, null si vide ou non-numérique
+                            payload.numPhoto = (form.value.numPhoto !== '' && !isNaN(form.value.numPhoto)) ? Number(form.value.numPhoto) : null;
+                        } else {
                         payload.tAir = form.value.tAir === "" ? null : parseFloat(form.value.tAir);
                         payload.wbgt = form.value.wbgt === "" ? null : parseFloat(form.value.wbgt);
                         payload.wb = form.value.wb === "" ? null : parseFloat(form.value.wb);
@@ -287,13 +346,18 @@
                         payload.gt = form.value.gt === "" ? null : parseFloat(form.value.gt);
                         payload.dpt = form.value.dpt === "" ? null : parseFloat(form.value.dpt);
                         payload.pression = form.value.pression === "" ? null : parseFloat(form.value.pression);
-                        payload.numCapteur = form.value.numCapteur;
-                        payload.numEnregAir = form.value.numEnregAir;
+                        payload.numCapteur = (form.value.numCapteur !== '' && !isNaN(form.value.numCapteur)) ? Number(form.value.numCapteur) : null;
+                        payload.numEnregAir = (form.value.numEnregAir !== '' && !isNaN(form.value.numEnregAir)) ? Number(form.value.numEnregAir) : null;
                     }
                     return payload;
                 };
 
                 const saveMesure = async () => {
+                    
+                    if (activeTab.value === 'air' && pressionInvalide.value) {
+                        alert("La pression atmosphérique est invalide. Veuillez entrer une valeur entre 900 et 1100 Pa.");
+                        return; // stoppe l'envoi
+                    }
                     isLoading.value = true;
                     
                     let payload = buildPayloadForDB();
@@ -448,7 +512,7 @@
                     if (isOnline.value) loadCloudData();
                 });
 
-                return { activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, pointHistorique, editingId, isCloudActive, isLoading, parametresAirAffiches, listeParametresAir,switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, updateChart, onEtablissementChange, loadCloudData };
+                return { activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, pointHistorique, editingId, isCloudActive, isLoading, parametresAirAffiches, listeParametresAir, pressionInvalide, switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, updateChart, onEtablissementChange, loadCloudData };
             }
         }).mount('#app');
     </script>
