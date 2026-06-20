@@ -19,44 +19,84 @@
     <div id="app" class="max-w-4xl mx-auto bg-white min-h-screen shadow-xl pb-10">
         
         <header class="bg-slate-800 text-white p-4 sticky top-0 z-20 shadow-md">
-            <div class="flex justify-between items-center">
+            <div class="mb-4 flex justify-between items-center">
                 <h1 class="text-xl font-bold">Mesures Environnementales</h1>
-                <div class="flex items-center gap-3">
-                    <!-- Indicateur de connexion -->
-                    <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-1">
+                <div class="flex items-center gap-3 relative">
+                    <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full animate-pulse" :class="isCloudActive ? 'bg-green-400' : 'bg-red-400'"></span>
-                        <span class="hidden sm:inline">{{ isCloudActive ? 'CONNEXION CLOUD' : 'MODE LOCAL' }}</span>
+                        {{ isCloudActive ? 'CLOUD' : 'LOCAL' }}
                     </div>
                     <!-- Menu hamburger -->
                     <div class="relative">
-                        <button @click="menuOpen = !menuOpen" class="text-white hover:text-gray-300 focus:outline-none">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                            </svg>
+                        <button @click="menuOpen = !menuOpen" class="text-white focus:outline-none text-2xl leading-none">
+                            ☰
                         </button>
-                        <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg py-1 z-30">
-                            <button @click="exportToExcel(); menuOpen = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
+                        <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-2 z-30 text-sm">
+                            <button @click="exportToExcel; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
                                 📥 Exporter Excel
+                            </button>
+                            <button @click="openGestionEtablissements" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                                ⚙️ Gérer établissements & points
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="grid grid-cols-2 gap-3">
                 <div class="bg-slate-700 p-2 rounded-lg flex flex-col border border-slate-600">
                     <label class="text-xs font-bold text-gray-400 mb-1">Établissement</label>
                     <select v-model="etablissement" @change="onEtablissementChange" class="w-full bg-slate-800 text-white p-1.5 rounded focus:ring-2 focus:ring-blue-500 border-none text-sm font-bold">
-                        <option value="Thierry Launay">Thierry Launay</option>
-                        <option value="Jean Jacques Rousseau">Jean Jacques Rousseau</option>
+                        <option v-for="etab in listeEtablissements" :key="etab" :value="etab">{{ etab }}</option>
                     </select>
                 </div>
                 <div class="bg-slate-700 p-2 rounded-lg flex flex-col border border-slate-600">
                     <label class="text-xs font-bold text-gray-400 mb-1">Date campagne</label>
                     <input type="date" v-model="dateCampagne" @change="updateChart" class="w-full bg-slate-800 text-white p-1.5 rounded focus:ring-2 focus:ring-blue-500 border-none text-sm font-bold">
+                    <!-- Dates disponibles -->
+                    <div v-if="datesCampagne.length > 0" class="flex flex-wrap gap-1 mt-1">
+                        <button v-for="d in datesCampagne" :key="d" @click="dateCampagne = d; updateChart()"
+                            class="text-xs bg-slate-600 hover:bg-slate-500 px-2 py-0.5 rounded"
+                            :class="{'bg-blue-600': dateCampagne === d}">
+                            {{ d }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
+
+        <!-- Modal gestion établissements -->
+        <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-800">Gestion des établissements & points</h2>
+                    <button @click="showGestion = false" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div v-for="(etab, index) in etablissementsData" :key="index" class="border rounded-lg p-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <input v-model="etab.nom" class="font-bold text-sm border p-1 rounded w-2/3" placeholder="Nom établissement">
+                            <button @click="supprimerEtablissement(index)" class="text-red-600 hover:text-red-800 text-sm">🗑️</button>
+                        </div>
+                        <div class="text-xs text-gray-600 mb-1">Points :</div>
+                        <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex gap-2 items-center mb-1 ml-2">
+                            <input v-model="point.id" placeholder="N°" class="w-16 border p-1 rounded text-xs">
+                            <input v-model="point.localisation" placeholder="Localisation" class="flex-1 border p-1 rounded text-xs">
+                            <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-xs">✕</button>
+                        </div>
+                        <button @click="ajouterPoint(index)" class="text-xs text-blue-600 hover:underline mt-1">+ Ajouter un point</button>
+                    </div>
+                    <button @click="ajouterEtablissement" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm font-bold">
+                        + Nouvel établissement
+                    </button>
+                </div>
+                
+                <button @click="sauvegarderEtablissements" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mt-2">
+                    Enregistrer
+                </button>
+            </div>
+        </div>
 
         <nav class="flex border-b border-gray-200 bg-gray-50">
             <button @click="switchTab('surface')" :class="activeTab === 'surface' ? 'border-b-4 border-orange-500 text-orange-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Surface</button>
@@ -84,7 +124,7 @@
                             <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Point de mesure</label>
                             <select v-model="form.point" @change="updateChart" required class="w-full p-3 border border-gray-300 rounded-lg font-bold text-lg bg-white">
                                 <option value="" disabled>Sélectionner...</option>
-                                <option v-for="p in pointsDisponibles" :key="p" :value="p">Point {{ p }}</option>
+                                <option v-for="p in pointsDisponibles" :key="p.id" :value="p.id">Point {{ p.id }} <span v-if="p.localisation">({{ p.localisation }})</span></option>
                             </select>
                         </div>
 
@@ -208,9 +248,9 @@
 
         createApp({
             setup() {
+                // ---- État existant ----
                 const isOnline = ref(navigator.onLine);
                 const isCloudActive = computed(() => isOnline.value && supabaseClient !== null);
-                const menuOpen = ref(false);
                 const parametresAirAffiches = ref(['tAir', 'wbgt']);
 
                 const listeParametresAir = [
@@ -244,8 +284,123 @@
                     return val < 900 || val > 1100;
                 });
 
-                const pointsDisponibles = computed(() => etablissement.value === 'Thierry Launay' ? ['1','2','3','3bis','4','5','6','7','8','9'] : ['1','2','3','4','5','6']);
+                // ---- Nouveaux : gestion établissements/points ----
+                const menuOpen = ref(false);
+                const showGestion = ref(false);
+                
+                // Structure par défaut (les deux existants)
+                const etablissementsDefaut = [
+                    { 
+                        nom: 'Thierry Launay',
+                        points: [
+                            { id: '1', localisation: '' }, { id: '2', localisation: '' }, { id: '3', localisation: '' },
+                            { id: '3bis', localisation: '' }, { id: '4', localisation: '' }, { id: '5', localisation: '' },
+                            { id: '6', localisation: '' }, { id: '7', localisation: '' }, { id: '8', localisation: '' },
+                            { id: '9', localisation: '' }
+                        ]
+                    },
+                    {
+                        nom: 'Jean Jacques Rousseau',
+                        points: [
+                            { id: '1', localisation: '' }, { id: '2', localisation: '' }, { id: '3', localisation: '' },
+                            { id: '4', localisation: '' }, { id: '5', localisation: '' }, { id: '6', localisation: '' }
+                        ]
+                    }
+                ];
 
+                const etablissementsData = ref(JSON.parse(JSON.stringify(etablissementsDefaut)));
+
+                // Charger depuis Supabase
+                const loadEtablissementsCloud = async () => {
+                    if (!isCloudActive.value) return;
+                    const { data, error } = await supabaseClient
+                        .from('etablissements')
+                        .select('data')
+                        .eq('id', 1)
+                        .single();
+                    if (error) {
+                        console.error('Erreur chargement etablissements:', error);
+                        return;
+                    }
+                    if (data && data.data) {
+                        etablissementsData.value = data.data;
+                        localStorage.setItem('etablissements_data', JSON.stringify(data.data));
+                    }
+                };
+
+                // Sauvegarder dans Supabase
+                const saveEtablissementsCloud = async () => {
+                    if (!isCloudActive.value) return;
+                    const payload = { id: 1, data: etablissementsData.value };
+                    const { error } = await supabaseClient
+                        .from('etablissements')
+                        .upsert(payload, { onConflict: 'id' });
+                    if (error) console.error('Erreur sauvegarde etablissements:', error);
+                };
+
+                const chargerEtablissements = () => {
+                    const saved = localStorage.getItem('etablissements_data');
+                    if (saved) {
+                        try {
+                            etablissementsData.value = JSON.parse(saved);
+                        } catch(e) {
+                            etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut));
+                        }
+                    } else {
+                        etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut));
+                    }
+                    // Tenter de récupérer la version cloud
+                    if (isCloudActive.value) loadEtablissementsCloud();
+                };
+                
+                chargerEtablissements();
+
+                const sauvegarderEtablissements = async () => {
+                    localStorage.setItem('etablissements_data', JSON.stringify(etablissementsData.value));
+                    await saveEtablissementsCloud();
+                    showGestion.value = false;
+                    if (!listeEtablissements.value.includes(etablissement.value)) {
+                        etablissement.value = listeEtablissements.value[0] || '';
+                    }
+                    menuOpen.value = false;
+                };
+
+                const listeEtablissements = computed(() => etablissementsData.value.map(e => e.nom).filter(Boolean));
+
+                const pointsDisponibles = computed(() => {
+                    const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
+                    return etab ? etab.points : [];
+                });
+
+                // Dates de campagnes (issues des mesures locales)
+                const datesCampagne = computed(() => {
+                    const dates = new Set();
+                    [...db.value.surface, ...db.value.air].forEach(m => {
+                        if (m.etablissement === etablissement.value && m.date) dates.add(m.date);
+                    });
+                    return Array.from(dates).sort();
+                });
+
+                const ajouterEtablissement = () => {
+                    etablissementsData.value.push({ nom: '', points: [] });
+                };
+                const supprimerEtablissement = (index) => {
+                    if (confirm("Supprimer cet établissement et tous ses points ?")) {
+                        etablissementsData.value.splice(index, 1);
+                    }
+                };
+                const ajouterPoint = (indexEtab) => {
+                    etablissementsData.value[indexEtab].points.push({ id: '', localisation: '' });
+                };
+                const supprimerPoint = (indexEtab, indexPoint) => {
+                    etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
+                };
+                const openGestionEtablissements = () => {
+                    menuOpen.value = false;
+                    showGestion.value = true;
+                };
+
+                // ---- Reprise des fonctions existantes ----
                 const pointHistorique = computed(() => {
                     if (!form.value.point) return [];
                     let hist = db.value[activeTab.value].filter(m => m.point === form.value.point && m.etablissement === etablissement.value && m.date === dateCampagne.value);
@@ -342,10 +497,33 @@
                     XLSX.writeFile(wb, `suivi_thermique_${dateStr}.xlsx`);
                 };
 
-                const onEtablissementChange = () => { localStorage.setItem('etablissement_pref', etablissement.value); form.value.point = ''; cancelEdit(); updateChart(); };
-                const switchTab = async (tab) => { activeTab.value = tab; const p = form.value.point; form.value = { ...baseForm, point: p }; cancelEdit(); await nextTick(); updateChart(); };
-                const editMesure = (mesure) => { form.value = { ...mesure }; editingId.value = mesure.id; window.scrollTo({ top: 0, behavior: 'smooth' }); };
-                const cancelEdit = () => { const p = form.value.point; form.value = { ...baseForm, point: p }; editingId.value = null; };
+                const onEtablissementChange = () => { 
+                    localStorage.setItem('etablissement_pref', etablissement.value); 
+                    form.value.point = ''; 
+                    cancelEdit(); 
+                    updateChart(); 
+                };
+                
+                const switchTab = async (tab) => { 
+                    activeTab.value = tab; 
+                    const p = form.value.point; 
+                    form.value = { ...baseForm, point: p }; 
+                    cancelEdit(); 
+                    await nextTick(); 
+                    updateChart(); 
+                };
+                
+                const editMesure = (mesure) => { 
+                    form.value = { ...mesure }; 
+                    editingId.value = mesure.id; 
+                    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                };
+                
+                const cancelEdit = () => { 
+                    const p = form.value.point; 
+                    form.value = { ...baseForm, point: p }; 
+                    editingId.value = null; 
+                };
 
                 const deleteMesure = async (id) => {
                     if(confirm("Êtes-vous sûr de vouloir supprimer cette mesure ?")) {
@@ -401,12 +579,6 @@
                     let payload = buildPayloadForDB();
                     let cloudSuccess = false;
 
-                    if (isCloudActive.value) {
-                        console.log('Tentative d\'envoi vers Supabase...');
-                        console.log('Payload:', payload);
-                        console.log('Table cible:', activeTab.value === 'surface' ? 'campagne_surface' : 'campagne_air');
-                    }
-
                     if (editingId.value) {
                         if (isCloudActive.value) {
                             const table = activeTab.value === 'surface' ? 'campagne_surface' : 'campagne_air';
@@ -421,7 +593,6 @@
                                 alert("⚠️ Erreur Supabase (Modification) :\nCode: " + error.code + "\nMessage: " + error.message);
                             } else {
                                 cloudSuccess = true;
-                                console.log('UPDATE réussi, réponse:', data);
                             }
                         }
                         
@@ -448,7 +619,6 @@
                                 alert("⚠️ Erreur Supabase (Création) :\nCode: " + error.code + "\nMessage: " + error.message);
                             } else {
                                 cloudSuccess = true;
-                                console.log('INSERT réussi, réponse:', data);
                             }
                         }
                         
@@ -537,14 +707,21 @@
                     window.addEventListener('offline', () => { isOnline.value = false; });
                     
                     if (isOnline.value) loadCloudData();
+                    if (isOnline.value) loadEtablissementsCloud();
                 });
 
                 return { 
                     activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, 
                     pointHistorique, editingId, isCloudActive, isLoading, 
-                    parametresAirAffiches, listeParametresAir, pressionInvalide, menuOpen, exportToExcel,
+                    parametresAirAffiches, listeParametresAir, pressionInvalide, exportToExcel,
                     switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
-                    updateChart, onEtablissementChange, loadCloudData 
+                    updateChart, onEtablissementChange, loadCloudData,
+                    // nouveaux
+                    menuOpen, showGestion, etablissementsData, listeEtablissements,
+                    datesCampagne,
+                    openGestionEtablissements, sauvegarderEtablissements,
+                    ajouterEtablissement, supprimerEtablissement,
+                    ajouterPoint, supprimerPoint
                 };
             }
         }).mount('#app');
