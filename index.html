@@ -729,7 +729,24 @@
 
     <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/suivi-thermique/sw.js').catch(() => {});
+        // Enregistrer le service worker
+        navigator.serviceWorker.register('/suivi-thermique/sw.js')
+            .then(registration => {
+                // Vérifier s'il y a une mise à jour et l'appliquer automatiquement
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Nouvelle version disponible : recharger la page
+                            window.location.reload();
+                        }
+                    });
+                });
+    
+                // Forcer une vérification de mise à jour au chargement
+                registration.update();
+            })
+            .catch(() => {});
     }
     </script>
 </body> 
