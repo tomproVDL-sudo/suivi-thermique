@@ -22,7 +22,11 @@
         <header class="bg-slate-800 text-white p-4 sticky top-0 z-20 shadow-md">
             <div class="mb-4 flex justify-between items-center">
                 <h1 class="text-xl font-bold">Mesures Environnementales</h1>
+                
+                <div class="text-xs text-gray-400 mt-1">v{{ appVersion }}</div>
+
                 <div class="flex items-center gap-3 relative">
+
                     <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full animate-pulse" :class="isCloudActive ? 'bg-green-400' : 'bg-red-400'"></span>
                         {{ isCloudActive ? 'CLOUD' : 'LOCAL' }}
@@ -299,6 +303,8 @@
                 const successMessage = ref('');
                 const etablissement = ref('Thierry Launay');
                 const dateCampagne = ref(new Date().toISOString().split('T')[0]);
+                const appVersion = ref(localStorage.getItem('app_version_local') || '?');
+
                 let chartInstance = null;
                 
                 const db = ref({ surface: [], air: [] });
