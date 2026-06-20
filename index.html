@@ -236,21 +236,33 @@
         </main>
     </div>
 
-    <!-- Gestion de version anti-cache -->
+    <!-- Nouveau script anti-cache basé sur version.json -->
     <script>
-        const APP_VERSION = '1.0.1'; // CHANGEZ ce numéro à chaque mise à jour
-        const currentVersion = localStorage.getItem('app_version');
-        if (currentVersion !== APP_VERSION) {
-            localStorage.setItem('app_version', APP_VERSION);
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                    registrations.forEach(reg => reg.unregister());
-                });
-            }
-            localStorage.removeItem('mesures_db_v6');
-            localStorage.removeItem('etablissements_data');
-            window.location.reload();
-        }
+        (async function checkVersion() {
+            const STORAGE_KEY = 'app_version_local';
+            try {
+                const response = await fetch('/suivi-thermique/version.json?t=' + Date.now());
+                if (!response.ok) return;
+                const data = await response.json();
+                const serverVersion = data.version;
+                const localVersion = localStorage.getItem(STORAGE_KEY);
+                
+                if (serverVersion !== localVersion) {
+                    localStorage.setItem(STORAGE_KEY, serverVersion);
+                    
+                    if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (const reg of registrations) {
+                            await reg.unregister();
+                        }
+                    }
+                    
+                    localStorage.removeItem('mesures_db_v6');
+                    localStorage.removeItem('etablissements_data');
+                    window.location.reload();
+                }
+            } catch (e) {}
+        })();
     </script>
 
     <script>
