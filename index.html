@@ -45,6 +45,18 @@
                             <button @click="openGestionEtablissements" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
                                 ⚙️ Gérer établissements & points
                             </button>
+
+                            <button @click="showMeteo = 'TL'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                                🌤️ Météo Thierry Launay
+                            </button>
+                            <button @click="showMeteo = 'JJR'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                                🌤️ Météo Jean Jacques Rousseau
+                            </button>
+                            <button @click="showMeteo = 'MF'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
+                                🌤️ Météo France
+                            </button>
+
+                            
                         </div>
                     </div>
                 </div>
@@ -73,15 +85,17 @@
         </header>
 
         <!-- Modal gestion établissements -->
-        <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-bold text-gray-800">Gestion des établissements & points</h2>
-                    <button @click="showGestion = false" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+        <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-60 z-30 flex items-center justify-center p-4">
+            <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+                
+                <!-- En-tête style météo -->
+                <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">                    <h2 class="text-sm font-bold">Gestion des établissements & points</h2>
+                    <button @click="showGestion = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
                 </div>
                 
-                <div class="space-y-4">
-                    <div v-for="(etab, index) in etablissementsData" :key="index" class="border rounded-lg p-3">
+                <!-- Contenu défilable -->
+                <div class="overflow-y-auto p-4 space-y-4 bg-gray-50">
+                    <div v-for="(etab, index) in etablissementsData" :key="index" class="border rounded-lg p-3 bg-white shadow-sm">
                         <div class="flex justify-between items-center mb-2">
                             <input v-model="etab.nom" class="font-bold text-sm border p-1 rounded w-2/3" placeholder="Nom établissement">
                             <button @click="supprimerEtablissement(index)" class="text-red-600 hover:text-red-800 text-sm">🗑️</button>
@@ -92,16 +106,19 @@
                             <input v-model="point.localisation" placeholder="Localisation" class="flex-1 border p-1 rounded text-xs">
                             <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-xs">✕</button>
                         </div>
-                        <button @click="ajouterPoint(index)" class="text-xs text-blue-600 hover:underline mt-1">+ Ajouter un point</button>
+                        <button @click="ajouterPoint(index)" class="text-xs text-gray-600 hover:underline mt-1">+ Ajouter un point</button>
                     </div>
                     <button @click="ajouterEtablissement" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm font-bold">
                         + Nouvel établissement
                     </button>
                 </div>
                 
-                <button @click="sauvegarderEtablissements" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mt-2">
-                    Enregistrer
-                </button>
+                <!-- Pied de page avec bouton Enregistrer -->
+                <div class="bg-gray-100 border-t p-3 rounded-b-xl">
+                        <button @click="sauvegarderEtablissements" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-blue-700 text-sm font-bold">
+                        Enregistrer
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -240,6 +257,52 @@
                 </div>
             </div>
         </main>
+
+            <!-- Modale météo -->
+            <div v-if="showMeteo" class="fixed inset-0 bg-black bg-opacity-60 z-30 flex items-center justify-center p-4">
+                <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+                    
+                    <!-- En-tête style gestion -->
+                    <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
+                        <h2 class="text-sm font-bold">
+                            {{ showMeteo === 'TL' ? 'Météo Thierry Launay' : (showMeteo === 'JJR' ? 'Météo Jean Jacques Rousseau' : 'Météo-France') }}
+                        </h2>
+                        <button @click="showMeteo = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
+                    </div>
+                    
+                    <!-- Contenu défilable -->
+                    <div class="overflow-y-auto p-4 space-y-4 bg-gray-100">
+                        <div class="w-full flex justify-center">
+                            <iframe 
+                                v-if="showMeteo === 'TL'"
+                                src="https://www.weatherlink.com/embeddablePage/show/28a2f0c3b11c472a9e61c4c5d560a533/slim"
+                                width="339" height="600" frameborder="0" class="max-w-full">
+                            </iframe>
+                            <iframe 
+                                v-if="showMeteo === 'JJR'"
+                                src="https://www.weatherlink.com/embeddablePage/show/ebb4686fbdc9422b98e23559df43fb4b/slim"
+                                width="339" height="600" frameborder="0" class="max-w-full">
+                            </iframe>
+                            <iframe 
+                                v-if="showMeteo === 'MF'"
+                                src="https://meteofrance.com/widget/prevision/593500##334155" 
+                                width="339" height="600" frameborder="0" class="max-w-full">
+                            </iframe>
+                        </div>
+                    </div>
+                    
+                    <!-- Pied de page avec bouton Fermer -->
+                    <div class="bg-gray-100 border-t p-3 rounded-b-xl">
+                        <button @click="showMeteo = false" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700 text-sm font-bold">
+                            Fermer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+
+        
     </div>
 
     <!-- Nouveau script anti-cache basé sur version.json -->
@@ -324,7 +387,8 @@
                 // ---- Gestion établissements/points ----
                 const menuOpen = ref(false);
                 const showGestion = ref(false);
-                
+                const showMeteo = ref(false);  // false, 'TL' ou 'JJR'
+
                 const etablissementsDefaut = [
                     { 
                         nom: 'Thierry Launay',
@@ -731,7 +795,7 @@
                 return { 
                     activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, appVersion,
                     pointHistorique, editingId, isCloudActive, isLoading, 
-                    parametresAirAffiches, listeParametresAir, pressionInvalide, exportToExcel,
+                    parametresAirAffiches, listeParametresAir, pressionInvalide, showMeteo, exportToExcel,
                     switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
                     updateChart, onEtablissementChange, loadCloudData,
                     menuOpen, showGestion, etablissementsData, listeEtablissements,
