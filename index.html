@@ -189,13 +189,14 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">WBGT (°C)</label><input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">WB (°C)</label><input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                <div><label class="font-bold text-gray-700">HI (°C)</label><input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">HR (%)</label><input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">GT (°C)</label><input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">WBGT (°C)</label><input v-model="form.wbgt" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">HI (°C)</label><input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">DPT (°C)</label><input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                <div><label class="font-bold text-gray-700">WB (°C)</label><input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded"></div>
+                                
                                 <div>
                                     <label class="font-bold text-gray-700">Pression (Pa)</label>
                                     <input v-model.number="form.pression" type="number" step="0.1" min="900" max="1100"
