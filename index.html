@@ -41,9 +41,7 @@
             z-index: 1000;
         }
         /* Le wrapper de la carte doit avoir overflow:hidden (déjà présent) */
-        .bg-white.rounded-xl.overflow-hidden {
-            overflow: hidden !important;
-        }
+
         .point-label {
             pointer-events: none !important; /* les clics traversent vers le marqueur */
         }
@@ -264,7 +262,7 @@
                 </div>
 
                 <!-- Carte avec légende superposée -->
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style="position: relative; min-height: 500px;">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm" style="position: relative; min-height: 500px; overflow: hidden;">                    
                     <div id="map" style="height: 500px; width: 100%; min-height: 500px;"></div>
                     
                     <!-- Légende de température (superposée en bas à droite) -->
@@ -815,16 +813,16 @@
                 };
 
                 const initMap = () => {
-                    // Nettoyer toute instance existante
+                    if (typeof L === 'undefined') {
+                        console.error('Leaflet library is not loaded!');
+                        return;
+                    }
                     cleanupMap();
-
                     const container = document.getElementById('map');
                     if (!container) {
                         console.warn('Container map non trouvé');
                         return;
                     }
-
-                    // S'assurer que le conteneur est visible et dimensionné
                     container.style.display = 'block';
                     container.style.height = '500px';
                     container.style.width = '100%';
