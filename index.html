@@ -189,6 +189,7 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-2 text-sm">
+                                
                                 <div><label class="font-bold text-gray-700">HR (%)</label><input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">GT (°C)</label><input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
@@ -626,7 +627,6 @@
                     let payload = {
                         id: editingId.value || Date.now().toString(),
                         date: dateCampagne.value,
-                        heure: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                         etablissement: etablissement.value,
                         point: form.value.point,
                         nuage: form.value.nuage,
@@ -634,6 +634,17 @@
                         vent: form.value.vent,
                         remarques: form.value.remarques
                     };
+
+
+                    // Conserver l'heure originale si on modifie, sinon créer une nouvelle heure
+                    if (editingId.value) {
+                        // Récupérer l'heure originale depuis la base de données locale
+                        const mesureOriginale = db.value[activeTab.value].find(m => m.id === editingId.value);
+                        payload.heure = mesureOriginale ? mesureOriginale.heure : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    } else {
+                        payload.heure = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+
 
                     if (activeTab.value === 'surface') {
                         payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
@@ -662,6 +673,7 @@
                     
                     let payload = buildPayloadForDB();
                     let cloudSuccess = false;
+                    const isEditing = !!editingId.value;
 
                     if (editingId.value) {
                         if (isCloudActive.value) {
@@ -712,13 +724,28 @@
 
                     saveData();
                     if (cloudSuccess) await loadCloudData();
-                    cancelEdit();
                     
                     isLoading.value = false;
-                    showSuccess.value = true; 
-                    setTimeout(() => showSuccess.value = false, 3000);
+                    showSuccess.value = true;
+                    
                     await nextTick();
                     updateChart();
+
+                    if (isEditing) {
+                        // Modification : garder le point, juste réinitialiser le reste du formulaire
+                        cancelEdit();
+                        setTimeout(() => {
+                            showSuccess.value = false;
+                        }, 3000);
+                    } else {
+                        // Nouvelle saisie : laisser voir le graphique 4 secondes, puis vider le point
+                        setTimeout(() => {
+                            form.value.point = '';
+                            cancelEdit();
+                            showSuccess.value = false;
+                            updateChart();
+                        }, 4000);
+                    }
                 };
 
                 const updateChart = () => {
