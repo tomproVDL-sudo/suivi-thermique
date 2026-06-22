@@ -14,6 +14,26 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Leaflet pour la carte -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .leaflet-container {
+            height: 100%;
+            width: 100%;
+            border-radius: 12px;
+        }
+        .timeline-slider {
+            accent-color: #1e293b;
+        }
+        .point-marker {
+            transition: all 0.3s ease;
+        }
+        .point-marker:hover {
+            transform: scale(1.2);
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans antialiased">
 
@@ -24,7 +44,6 @@
                 <h1 class="text-xl font-bold">Mesures Environnementales</h1>
                 
                 <div class="flex items-center gap-3 relative">
-                    <!-- Bloc statut + version -->
                     <div class="flex flex-col items-end">
                         <div :class="isCloudActive ? 'text-green-400' : 'text-red-400'" class="text-xs font-bold flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full animate-pulse" :class="isCloudActive ? 'bg-green-400' : 'bg-red-400'"></span>
@@ -33,30 +52,14 @@
                         <div class="text-xs text-gray-400">v{{ appVersion }}</div>
                     </div>
         
-                    <!-- Menu hamburger -->
                     <div class="relative">
-                        <button @click="menuOpen = !menuOpen" class="text-white focus:outline-none text-2xl leading-none">
-                            ☰
-                        </button>
-                        <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-2 z-30 text-sm">
-                            <button @click="exportToExcel(); menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                                📥 Exporter Excel
-                            </button>
-                            <button @click="openGestionEtablissements" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                                ⚙️ Gérer établissements & points
-                            </button>
-
-                            <button @click="showMeteo = 'TL'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                                🌤️ Météo Thierry Launay
-                            </button>
-                            <button @click="showMeteo = 'JJR'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                                🌤️ Météo Jean Jacques Rousseau
-                            </button>
-                            <button @click="showMeteo = 'MF'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                                🌤️ Météo France
-                            </button>
-
-                            
+                        <button @click="menuOpen = !menuOpen" class="text-white focus:outline-none text-2xl leading-none">☰</button>
+                        <div v-if="menuOpen" class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-2 z-[9999] text-sm">
+                            <button @click="exportToExcel(); menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">📥 Exporter Excel</button>
+                            <button @click="openGestionEtablissements" class="block w-full text-left px-4 py-2 hover:bg-gray-100">⚙️ Gérer établissements & points</button>
+                            <button @click="showMeteo = 'TL'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo Thierry Launay</button>
+                            <button @click="showMeteo = 'JJR'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo Jean Jacques Rousseau</button>
+                            <button @click="showMeteo = 'MF'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo France</button>
                         </div>
                     </div>
                 </div>
@@ -71,10 +74,9 @@
                 </div>
                 <div class="bg-slate-700 p-2 rounded-lg flex flex-col border border-slate-600">
                     <label class="text-xs font-bold text-gray-400 mb-1">Date campagne</label>
-                    <input type="date" v-model="dateCampagne" @change="updateChart" class="w-full bg-slate-800 text-white p-1.5 rounded focus:ring-2 focus:ring-blue-500 border-none text-sm font-bold">
-                    <!-- Dates disponibles -->
+                    <input type="date" v-model="dateCampagne" @change="onDateChange" class="w-full bg-slate-800 text-white p-1.5 rounded focus:ring-2 focus:ring-blue-500 border-none text-sm font-bold">
                     <div v-if="datesCampagne.length > 0" class="flex flex-wrap gap-1 mt-1">
-                        <button v-for="d in datesCampagne" :key="d" @click="dateCampagne = d; updateChart()"
+                        <button v-for="d in datesCampagne" :key="d" @click="dateCampagne = d; onDateChange()"
                             class="text-xs bg-slate-600 hover:bg-slate-500 px-2 py-0.5 rounded"
                             :class="{'bg-blue-600': dateCampagne === d}">
                             {{ d }}
@@ -85,15 +87,12 @@
         </header>
 
         <!-- Modal gestion établissements -->
-        <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-60 z-30 flex items-center justify-center p-4">
+        <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">            
             <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
-                
-                <!-- En-tête style météo -->
-                <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">                    <h2 class="text-sm font-bold">Gestion des établissements & points</h2>
+                <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
+                    <h2 class="text-sm font-bold">Gestion des établissements & points</h2>
                     <button @click="showGestion = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
                 </div>
-                
-                <!-- Contenu défilable -->
                 <div class="overflow-y-auto p-4 space-y-4 bg-gray-50">
                     <div v-for="(etab, index) in etablissementsData" :key="index" class="border rounded-lg p-3 bg-white shadow-sm">
                         <div class="flex justify-between items-center mb-2">
@@ -104,27 +103,25 @@
                         <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex gap-2 items-center mb-1 ml-2">
                             <input v-model="point.id" placeholder="N°" class="w-16 border p-1 rounded text-xs">
                             <input v-model="point.localisation" placeholder="Localisation" class="flex-1 border p-1 rounded text-xs">
+                            <input v-model="point.lat" placeholder="Lat" class="w-20 border p-1 rounded text-xs" type="number" step="0.000001">
+                            <input v-model="point.lng" placeholder="Lng" class="w-20 border p-1 rounded text-xs" type="number" step="0.000001">
                             <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-xs">✕</button>
                         </div>
                         <button @click="ajouterPoint(index)" class="text-xs text-gray-600 hover:underline mt-1">+ Ajouter un point</button>
                     </div>
-                    <button @click="ajouterEtablissement" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm font-bold">
-                        + Nouvel établissement
-                    </button>
+                    <button @click="ajouterEtablissement" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm font-bold">+ Nouvel établissement</button>
                 </div>
-                
-                <!-- Pied de page avec bouton Enregistrer -->
                 <div class="bg-gray-100 border-t p-3 rounded-b-xl">
-                        <button @click="sauvegarderEtablissements" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-blue-700 text-sm font-bold">
-                        Enregistrer
-                    </button>
+                    <button @click="sauvegarderEtablissements" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-blue-700 text-sm font-bold">Enregistrer</button>
                 </div>
             </div>
         </div>
 
+        <!-- Onglets -->
         <nav class="flex border-b border-gray-200 bg-gray-50">
             <button @click="switchTab('surface')" :class="activeTab === 'surface' ? 'border-b-4 border-orange-500 text-orange-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Surface</button>
             <button @click="switchTab('air')" :class="activeTab === 'air' ? 'border-b-4 border-blue-500 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Air & WBGT</button>
+            <button @click="switchTab('carte')" :class="activeTab === 'carte' ? 'border-b-4 border-green-500 text-green-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">🗺️ Carte</button>
         </nav>
 
         <main class="p-4 space-y-6">
@@ -132,15 +129,14 @@
                 <p class="font-bold text-sm">{{ successMessage }}</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Contenu Surface / Air -->
+            <div v-if="activeTab !== 'carte'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
                     <div class="flex justify-between items-center mb-4 border-b pb-2">
                         <h2 class="text-lg font-bold" :class="activeTab === 'surface' ? 'text-orange-600' : 'text-blue-600'">
                             {{ editingId ? 'Modifier la mesure' : 'Nouvelle saisie' }}
                         </h2>
-                        <button v-if="editingId" @click="cancelEdit" class="text-xs bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-1 px-2 rounded">
-                            Annuler
-                        </button>
+                        <button v-if="editingId" @click="cancelEdit" class="text-xs bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-1 px-2 rounded">Annuler</button>
                     </div>
                     
                     <form @submit.prevent="saveMesure" class="space-y-4">
@@ -160,36 +156,17 @@
 
                         <div v-if="activeTab === 'surface'" class="space-y-3">
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">T° Surface (°C)</label><input v-model="form.tSurface" type="number" step="0.1" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">N° Photo</label>
-                                <input v-model.number="form.numPhoto" type="number" step="1" min="0" 
-                                    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500">
-                            </div>                           
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">N° Photo</label><input v-model.number="form.numPhoto" type="number" step="1" min="0" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>                           
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label><input v-model="form.remarques" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500"></div>
                         </div>
 
                         <div v-if="activeTab === 'air'" class="space-y-3">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label>
-                                <input v-model="form.remarques" type="text" 
-                                    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                            </div>
-
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Remarques</label><input v-model="form.remarques" type="text" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"></div>
                             <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700">N° Capteur</label>
-                                    <input v-model.number="form.numCapteur" type="number" step="1" min="0"
-                                        class="w-full p-2 border rounded">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700">N° Enregistrement</label>
-                                    <input v-model.number="form.numEnregAir" type="number" step="1" min="0"
-                                        class="w-full p-2 border rounded">
-                                </div>
+                                <div><label class="block text-sm font-bold text-gray-700">N° Capteur</label><input v-model.number="form.numCapteur" type="number" step="1" min="0" class="w-full p-2 border rounded"></div>
+                                <div><label class="block text-sm font-bold text-gray-700">N° Enregistrement</label><input v-model.number="form.numEnregAir" type="number" step="1" min="0" class="w-full p-2 border rounded"></div>
                             </div>
-
                             <div class="grid grid-cols-2 gap-2 text-sm">
-                                
                                 <div><label class="font-bold text-gray-700">HR (%)</label><input v-model="form.hr" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">T° Air (°C)</label><input v-model="form.tAir" type="number" step="0.1" required class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">GT (°C)</label><input v-model="form.gt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
@@ -197,16 +174,8 @@
                                 <div><label class="font-bold text-gray-700">HI (°C)</label><input v-model="form.hi" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">DPT (°C)</label><input v-model="form.dpt" type="number" step="0.1" class="w-full p-2 border rounded"></div>
                                 <div><label class="font-bold text-gray-700">WB (°C)</label><input v-model="form.wb" type="number" step="0.1" class="w-full p-2 border rounded"></div>
-                                
-                                <div>
-                                    <label class="font-bold text-gray-700">Pression (Pa)</label>
-                                    <input v-model.number="form.pression" type="number" step="0.1" min="900" max="1100"
-                                        class="w-full p-2 border rounded"
-                                        :class="{ 'border-red-500 bg-red-50': pressionInvalide }">
-                                    <p v-if="pressionInvalide" class="text-red-600 text-xs mt-1">
-                                        La pression doit être comprise entre 900 et 1100 Pa.
-                                    </p>
-                                </div>
+                                <div><label class="font-bold text-gray-700">Pression (Pa)</label><input v-model.number="form.pression" type="number" step="0.1" min="900" max="1100" class="w-full p-2 border rounded" :class="{ 'border-red-500 bg-red-50': pressionInvalide }">
+                                <p v-if="pressionInvalide" class="text-red-600 text-xs mt-1">La pression doit être comprise entre 900 et 1100 Pa.</p></div>
                             </div>
                         </div>
 
@@ -219,20 +188,16 @@
                 <div class="flex flex-col gap-4">
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                         <h3 class="text-xs font-bold text-gray-500 mb-2 text-center uppercase">Point {{ form.point || '?' }}</h3>
-                        
                         <div v-if="activeTab === 'air' && form.point" class="flex flex-wrap gap-2 mb-3 justify-center">
                             <label v-for="param in listeParametresAir" :key="param.key" class="flex items-center gap-1 text-xs font-medium cursor-pointer">
                                 <input type="checkbox" :value="param.key" v-model="parametresAirAffiches" @change="updateChart" class="rounded">
                                 <span :style="{ color: param.couleur }">{{ param.label }}</span>
                             </label>
                         </div>
-
                         <div v-show="form.point" class="relative h-64 w-full">
                             <canvas id="myChart"></canvas>
                         </div>
-                        <div v-if="!form.point" class="h-64 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed rounded-lg">
-                            Sélectionnez un point
-                        </div>
+                        <div v-if="!form.point" class="h-64 flex items-center justify-center text-gray-400 text-sm border-2 border-dashed rounded-lg">Sélectionnez un point</div>
                     </div>
 
                     <div v-if="form.point && pointHistorique.length > 0" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -258,56 +223,80 @@
                     </div>
                 </div>
             </div>
-        </main>
 
-            <!-- Modale météo -->
-            <div v-if="showMeteo" class="fixed inset-0 bg-black bg-opacity-60 z-30 flex items-center justify-center p-4">
-                <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
-                    
-                    <!-- En-tête style gestion -->
-                    <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
-                        <h2 class="text-sm font-bold">
-                            {{ showMeteo === 'TL' ? 'Météo Thierry Launay' : (showMeteo === 'JJR' ? 'Météo Jean Jacques Rousseau' : 'Météo-France') }}
-                        </h2>
-                        <button @click="showMeteo = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
+            <!-- Onglet Carte -->
+            <div v-if="activeTab === 'carte'" class="space-y-4">
+                <!-- Contrôles -->
+                <div class="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-bold text-gray-700">Type:</label>
+                        <select v-model="carteType" class="p-2 border rounded text-sm bg-white">
+                            <option value="tSurface">T° Surface</option>
+                            <option value="tAir">T° Air</option>
+                            <option value="wbgt">WBGT</option>
+                        </select>
                     </div>
+                    <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                        <label class="text-sm font-bold text-gray-700">Heure:</label>
+                        <input type="range" v-model="carteHeure" min="0" max="23" step="1" class="flex-1 timeline-slider">
+                        <span class="text-sm font-mono bg-white px-3 py-1 rounded border">{{ carteHeure }}:00</span>
+                    </div>
+                    <button @click="toggleAnimation" class="px-4 py-2 rounded-lg font-bold text-sm" :class="animationActive ? 'bg-red-500 text-white' : 'bg-green-500 text-white'">
+                        {{ animationActive ? '⏹️ Stop' : '▶️ Animation' }}
+                    </button>
+                    <button @click="forceRefreshMap" class="px-4 py-2 rounded-lg font-bold text-sm bg-blue-500 text-white hover:bg-blue-600">
+                        🔄 Rafraîchir
+                    </button>
+                </div>
+
+                <!-- Carte avec légende superposée -->
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style="position: relative; min-height: 500px;">
+                    <div id="map" style="height: 500px; width: 100%; min-height: 500px;"></div>
                     
-                    <!-- Contenu défilable -->
-                    <div class="overflow-y-auto p-4 space-y-4 bg-gray-100">
-                        <div class="w-full flex justify-center">
-                            <iframe 
-                                v-if="showMeteo === 'TL'"
-                                src="https://www.weatherlink.com/embeddablePage/show/28a2f0c3b11c472a9e61c4c5d560a533/slim"
-                                width="339" height="600" frameborder="0" class="max-w-full">
-                            </iframe>
-                            <iframe 
-                                v-if="showMeteo === 'JJR'"
-                                src="https://www.weatherlink.com/embeddablePage/show/ebb4686fbdc9422b98e23559df43fb4b/slim"
-                                width="339" height="600" frameborder="0" class="max-w-full">
-                            </iframe>
-                            <iframe 
-                                v-if="showMeteo === 'MF'"
-                                src="https://meteofrance.com/widget/prevision/593500##334155" 
-                                width="339" height="600" frameborder="0" class="max-w-full">
-                            </iframe>
+                    <!-- Légende de température (superposée en bas à droite) -->
+                    <div id="temperature-legend" style="position: absolute; bottom: 20px; right: 20px; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000; width: 160px; pointer-events: none;">
+                        <div style="font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 4px;">Température (°C)</div>
+                        <div id="legend-gradient" style="height: 20px; width: 100%; border-radius: 4px;"></div>
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; margin-top: 2px;">
+                            <span id="legend-min">10</span>
+                            <span id="legend-max">45</span>
                         </div>
                     </div>
-                    
-                    <!-- Pied de page avec bouton Fermer -->
-                    <div class="bg-gray-100 border-t p-3 rounded-b-xl">
-                        <button @click="showMeteo = false" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700 text-sm font-bold">
-                            Fermer
-                        </button>
-                    </div>
+                </div>
+
+                <!-- Légende des points (existante) -->
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4 justify-center">
+                    <span v-for="point in pointsAvecDonnees" :key="point.id" class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full inline-block" :style="{ backgroundColor: getColorForValue(point.valeur) }"></span>
+                        Point {{ point.id }}: {{ point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A' }}
+                    </span>
                 </div>
             </div>
+            
+        </main>
 
-
-
-        
+        <!-- Modale météo -->
+        <div v-if="showMeteo" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">
+            <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+                <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
+                    <h2 class="text-sm font-bold">{{ showMeteo === 'TL' ? 'Météo Thierry Launay' : (showMeteo === 'JJR' ? 'Météo Jean Jacques Rousseau' : 'Météo-France') }}</h2>
+                    <button @click="showMeteo = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
+                </div>
+                <div class="overflow-y-auto p-4 space-y-4 bg-gray-100">
+                    <div class="w-full flex justify-center">
+                        <iframe v-if="showMeteo === 'TL'" src="https://www.weatherlink.com/embeddablePage/show/28a2f0c3b11c472a9e61c4c5d560a533/slim" width="339" height="600" frameborder="0" class="max-w-full"></iframe>
+                        <iframe v-if="showMeteo === 'JJR'" src="https://www.weatherlink.com/embeddablePage/show/ebb4686fbdc9422b98e23559df43fb4b/slim" width="339" height="600" frameborder="0" class="max-w-full"></iframe>
+                        <iframe v-if="showMeteo === 'MF'" src="https://meteofrance.com/widget/prevision/593500##334155" width="339" height="600" frameborder="0" class="max-w-full"></iframe>
+                    </div>
+                </div>
+                <div class="bg-gray-100 border-t p-3 rounded-b-xl">
+                    <button @click="showMeteo = false" class="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700 text-sm font-bold">Fermer</button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Nouveau script anti-cache basé sur version.json -->
+    <!-- Script anti-cache -->
     <script>
         (async function checkVersion() {
             const STORAGE_KEY = 'app_version_local';
@@ -317,17 +306,12 @@
                 const data = await response.json();
                 const serverVersion = data.version;
                 const localVersion = localStorage.getItem(STORAGE_KEY);
-                
                 if (serverVersion !== localVersion) {
                     localStorage.setItem(STORAGE_KEY, serverVersion);
-                    
                     if ('serviceWorker' in navigator) {
                         const registrations = await navigator.serviceWorker.getRegistrations();
-                        for (const reg of registrations) {
-                            await reg.unregister();
-                        }
+                        for (const reg of registrations) { await reg.unregister(); }
                     }
-                    
                     localStorage.removeItem('mesures_db_v6');
                     localStorage.removeItem('etablissements_data');
                     window.location.reload();
@@ -337,7 +321,7 @@
     </script>
 
     <script>
-        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick, watch, onUnmounted } = Vue;
 
         const SUPABASE_URL = 'https://nxtlihyemnrzbxhezryf.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54dGxpaHllbW5yemJ4aGV6cnlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NTkxNTMsImV4cCI6MjA5NzUzNTE1M30.FZ-6x6VAOfPVMb-_IhY_dbxiwJ0wTJ0A_IRyWNDeMUM';
@@ -352,7 +336,6 @@
                 const isOnline = ref(navigator.onLine);
                 const isCloudActive = computed(() => isOnline.value && supabaseClient !== null);
                 const parametresAirAffiches = ref(['tAir', 'wbgt']);
-
                 const listeParametresAir = [
                     { key: 'tAir', label: 'T° Air', couleur: '#3b82f6' },
                     { key: 'wbgt', label: 'WBGT', couleur: '#8b5cf6' },
@@ -371,14 +354,27 @@
                 const etablissement = ref('Thierry Launay');
                 const dateCampagne = ref(new Date().toISOString().split('T')[0]);
                 const appVersion = ref(localStorage.getItem('app_version_local') || '?');
+                const menuOpen = ref(false);
+                const showGestion = ref(false);
+                const showMeteo = ref(false);
 
                 let chartInstance = null;
-                
+                let mapInstance = null;
+                let mapMarkers = [];
+                let animationInterval = null;
+                let carteDataCache = {};
+
                 const db = ref({ surface: [], air: [] });
                 
                 const baseForm = { point: '', nuage: 'Absent', ombre: 'Absent', vent: 'Absent', remarques: '', tSurface: '', numPhoto: '', tAir: '', wbgt: '', wb: '', hi: '', hr: '', gt: '', dpt: '', pression: '', numCapteur: '', numEnregAir: '' };
                 const form = ref({ ...baseForm });
-                const editingId = ref(null); 
+                const editingId = ref(null);
+
+                // Variables carte
+                const carteType = ref('tSurface');
+                const carteHeure = ref(8);
+                const animationActive = ref(false);
+                const pointsAvecDonnees = ref([]);
 
                 const pressionInvalide = computed(() => {
                     if (form.value.pression === '' || form.value.pression === null || isNaN(form.value.pression)) return false;
@@ -386,82 +382,61 @@
                     return val < 900 || val > 1100;
                 });
 
-                // ---- Gestion établissements/points ----
-                const menuOpen = ref(false);
-                const showGestion = ref(false);
-                const showMeteo = ref(false);  // false, 'TL' ou 'JJR'
-
                 const etablissementsDefaut = [
                     { 
                         nom: 'Thierry Launay',
                         points: [
-                            { id: '1', localisation: '' }, { id: '2', localisation: '' }, { id: '3', localisation: '' },
-                            { id: '3bis', localisation: '' }, { id: '4', localisation: '' }, { id: '5', localisation: '' },
-                            { id: '6', localisation: '' }, { id: '7', localisation: '' }, { id: '8', localisation: '' },
-                            { id: '9', localisation: '' }
+                            { id: '1', localisation: 'Entrée', lat: 44.8378, lng: -0.5800 },
+                            { id: '2', localisation: 'Milieu', lat: 44.8385, lng: -0.5795 },
+                            { id: '3', localisation: 'Sortie', lat: 44.8390, lng: -0.5790 },
+                            { id: '4', localisation: 'Nord', lat: 44.8395, lng: -0.5805 },
+                            { id: '5', localisation: 'Sud', lat: 44.8370, lng: -0.5790 },
                         ]
                     },
                     {
                         nom: 'Jean Jacques Rousseau',
                         points: [
-                            { id: '1', localisation: '' }, { id: '2', localisation: '' }, { id: '3', localisation: '' },
-                            { id: '4', localisation: '' }, { id: '5', localisation: '' }, { id: '6', localisation: '' }
+                            { id: '1', localisation: 'Entrée', lat: 44.8500, lng: -0.5700 },
+                            { id: '2', localisation: 'Milieu', lat: 44.8507, lng: -0.5695 },
+                            { id: '3', localisation: 'Sortie', lat: 44.8512, lng: -0.5690 },
+                            { id: '4', localisation: 'Nord', lat: 44.8517, lng: -0.5705 },
+                            { id: '5', localisation: 'Sud', lat: 44.8492, lng: -0.5690 },
                         ]
                     }
                 ];
 
                 const etablissementsData = ref(JSON.parse(JSON.stringify(etablissementsDefaut)));
 
+                // Chargement des établissements
                 const loadEtablissementsCloud = async () => {
                     if (!isCloudActive.value) return;
-                    const { data, error } = await supabaseClient
-                        .from('etablissements')
-                        .select('data')
-                        .eq('id', 1)
-                        .maybeSingle();
-                    if (error) {
-                        console.error('Erreur chargement etablissements:', error);
-                        return;
-                    }
-                    if (data && data.data) {
-                        etablissementsData.value = data.data;
-                        localStorage.setItem('etablissements_data', JSON.stringify(data.data));
-                    }
+                    const { data, error } = await supabaseClient.from('etablissements').select('data').eq('id', 1).maybeSingle();
+                    if (error) { console.error('Erreur chargement etablissements:', error); return; }
+                    if (data && data.data) { etablissementsData.value = data.data; localStorage.setItem('etablissements_data', JSON.stringify(data.data)); }
                 };
 
                 const saveEtablissementsCloud = async () => {
                     if (!isCloudActive.value) return;
                     const payload = { id: 1, data: etablissementsData.value };
-                    const { error } = await supabaseClient
-                        .from('etablissements')
-                        .upsert(payload, { onConflict: 'id' });
+                    const { error } = await supabaseClient.from('etablissements').upsert(payload, { onConflict: 'id' });
                     if (error) console.error('Erreur sauvegarde etablissements:', error);
                 };
 
                 const chargerEtablissements = () => {
                     const saved = localStorage.getItem('etablissements_data');
-                    if (saved) {
-                        try {
-                            etablissementsData.value = JSON.parse(saved);
-                        } catch(e) {
-                            etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut));
-                        }
-                    } else {
-                        etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut));
-                    }
+                    if (saved) { try { etablissementsData.value = JSON.parse(saved); } catch(e) { etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut)); } } 
+                    else { etablissementsData.value = JSON.parse(JSON.stringify(etablissementsDefaut)); }
                     if (isCloudActive.value) loadEtablissementsCloud();
                 };
-                
                 chargerEtablissements();
 
                 const sauvegarderEtablissements = async () => {
                     localStorage.setItem('etablissements_data', JSON.stringify(etablissementsData.value));
                     await saveEtablissementsCloud();
                     showGestion.value = false;
-                    if (!listeEtablissements.value.includes(etablissement.value)) {
-                        etablissement.value = listeEtablissements.value[0] || '';
-                    }
+                    if (!listeEtablissements.value.includes(etablissement.value)) etablissement.value = listeEtablissements.value[0] || '';
                     menuOpen.value = false;
+                    initMap();
                 };
 
                 const listeEtablissements = computed(() => etablissementsData.value.map(e => e.nom).filter(Boolean));
@@ -480,18 +455,15 @@
                 });
 
                 const ajouterEtablissement = () => etablissementsData.value.push({ nom: '', points: [] });
-                const supprimerEtablissement = (index) => {
-                    if (confirm("Supprimer cet établissement et tous ses points ?")) etablissementsData.value.splice(index, 1);
-                };
-                const ajouterPoint = (indexEtab) => etablissementsData.value[indexEtab].points.push({ id: '', localisation: '' });
+                const supprimerEtablissement = (index) => { if (confirm("Supprimer cet établissement et tous ses points ?")) etablissementsData.value.splice(index, 1); };
+                const ajouterPoint = (indexEtab) => etablissementsData.value[indexEtab].points.push({ id: '', localisation: '', lat: null, lng: null });
                 const supprimerPoint = (indexEtab, indexPoint) => etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
                 const openGestionEtablissements = () => { menuOpen.value = false; showGestion.value = true; };
 
-                // ---- Fonctions existantes ----
                 const pointHistorique = computed(() => {
                     if (!form.value.point) return [];
                     let hist = db.value[activeTab.value].filter(m => m.point === form.value.point && m.etablissement === etablissement.value && m.date === dateCampagne.value);
-                    return hist.sort((a, b) => b.heure.localeCompare(a.heure)); 
+                    return hist.sort((a, b) => b.heure.localeCompare(a.heure));
                 });
 
                 const saveData = () => localStorage.setItem('mesures_db_v6', JSON.stringify(db.value));
@@ -501,114 +473,66 @@
                     try {
                         const { data: surfaceData, error: errSurf } = await supabaseClient.from('campagne_surface').select('*');
                         if (errSurf) console.error("Erreur téléchargement Surface:", errSurf);
-                        if (surfaceData) {
-                            const map = new Map(db.value.surface.map(item => [item.id, item]));
-                            surfaceData.forEach(item => map.set(item.id, item));
-                            db.value.surface = Array.from(map.values());
-                        }
+                        if (surfaceData) { const map = new Map(db.value.surface.map(item => [item.id, item])); surfaceData.forEach(item => map.set(item.id, item)); db.value.surface = Array.from(map.values()); }
 
                         const { data: airData, error: errAir } = await supabaseClient.from('campagne_air').select('*');
                         if (errAir) console.error("Erreur téléchargement Air:", errAir);
-                        if (airData) {
-                            const map = new Map(db.value.air.map(item => [item.id, item]));
-                            airData.forEach(item => map.set(item.id, item));
-                            db.value.air = Array.from(map.values());
-                        }
+                        if (airData) { const map = new Map(db.value.air.map(item => [item.id, item])); airData.forEach(item => map.set(item.id, item)); db.value.air = Array.from(map.values()); }
 
                         saveData();
                         updateChart();
-                    } catch (error) {
-                        console.error("Erreur globale de synchronisation:", error);
-                    }
+                        updateCarte();
+                    } catch (error) { console.error("Erreur globale de synchronisation:", error); }
                 };
 
                 const exportToExcel = async () => {
                     if (isCloudActive.value) await loadCloudData();
-                    
-                    const surfaceData = db.value.surface.map(m => ({
-                        'ID': m.id,
-                        'Date': m.date,
-                        'Heure': m.heure,
-                        'Établissement': m.etablissement,
-                        'Point': m.point,
-                        'Nuage': m.nuage,
-                        'Ombre': m.ombre,
-                        'Vent': m.vent,
-                        'Remarques': m.remarques,
-                        'T° Surface (°C)': m.tSurface,
-                        'N° Photo': m.numPhoto
-                    }));
-
-                    const airData = db.value.air.map(m => ({
-                        'ID': m.id,
-                        'Date': m.date,
-                        'Heure': m.heure,
-                        'Établissement': m.etablissement,
-                        'Point': m.point,
-                        'Nuage': m.nuage,
-                        'Ombre': m.ombre,
-                        'Vent': m.vent,
-                        'Remarques': m.remarques,
-                        'T° Air (°C)': m.tAir,
-                        'WBGT (°C)': m.wbgt,
-                        'WB (°C)': m.wb,
-                        'HI (°C)': m.hi,
-                        'HR (%)': m.hr,
-                        'GT (°C)': m.gt,
-                        'DPT (°C)': m.dpt,
-                        'Pression (Pa)': m.pression,
-                        'N° Capteur': m.numCapteur,
-                        'N° Enregistrement': m.numEnregAir
-                    }));
-
+                    const surfaceData = db.value.surface.map(m => ({ 'ID': m.id, 'Date': m.date, 'Heure': m.heure, 'Établissement': m.etablissement, 'Point': m.point, 'Nuage': m.nuage, 'Ombre': m.ombre, 'Vent': m.vent, 'Remarques': m.remarques, 'T° Surface (°C)': m.tSurface, 'N° Photo': m.numPhoto }));
+                    const airData = db.value.air.map(m => ({ 'ID': m.id, 'Date': m.date, 'Heure': m.heure, 'Établissement': m.etablissement, 'Point': m.point, 'Nuage': m.nuage, 'Ombre': m.ombre, 'Vent': m.vent, 'Remarques': m.remarques, 'T° Air (°C)': m.tAir, 'WBGT (°C)': m.wbgt, 'WB (°C)': m.wb, 'HI (°C)': m.hi, 'HR (%)': m.hr, 'GT (°C)': m.gt, 'DPT (°C)': m.dpt, 'Pression (Pa)': m.pression, 'N° Capteur': m.numCapteur, 'N° Enregistrement': m.numEnregAir }));
                     const wb = XLSX.utils.book_new();
-                    
-                    if (surfaceData.length > 0) {
-                        const wsSurface = XLSX.utils.json_to_sheet(surfaceData);
-                        XLSX.utils.book_append_sheet(wb, wsSurface, "Surface");
-                    }
-                    
-                    if (airData.length > 0) {
-                        const wsAir = XLSX.utils.json_to_sheet(airData);
-                        XLSX.utils.book_append_sheet(wb, wsAir, "Air");
-                    }
-                    
-                    if (surfaceData.length === 0 && airData.length === 0) {
-                        alert("Aucune donnée à exporter.");
-                        return;
-                    }
-                    
+                    if (surfaceData.length > 0) { const wsSurface = XLSX.utils.json_to_sheet(surfaceData); XLSX.utils.book_append_sheet(wb, wsSurface, "Surface"); }
+                    if (airData.length > 0) { const wsAir = XLSX.utils.json_to_sheet(airData); XLSX.utils.book_append_sheet(wb, wsAir, "Air"); }
+                    if (surfaceData.length === 0 && airData.length === 0) { alert("Aucune donnée à exporter."); return; }
                     const dateStr = new Date().toISOString().slice(0,10);
                     XLSX.writeFile(wb, `suivi_thermique_${dateStr}.xlsx`);
                 };
 
-                const onEtablissementChange = () => { 
-                    localStorage.setItem('etablissement_pref', etablissement.value); 
-                    form.value.point = ''; 
-                    cancelEdit(); 
-                    updateChart(); 
+                const onEtablissementChange = () => {
+                    localStorage.setItem('etablissement_pref', etablissement.value);
+                    form.value.point = '';
+                    cancelEdit();
+                    updateChart();
+                    if (activeTab.value === 'carte') {
+                        cleanupMap();
+                        setTimeout(() => {
+                            initMap();
+                        }, 100);
+                    }
                 };
                 
-                const switchTab = async (tab) => { 
-                    activeTab.value = tab; 
-                    const p = form.value.point; 
-                    form.value = { ...baseForm, point: p }; 
-                    cancelEdit(); 
-                    await nextTick(); 
-                    updateChart(); 
+                const onDateChange = () => { updateChart(); updateCarte(); };
+
+                const switchTab = async (tab) => {
+                    activeTab.value = tab;
+                    if (tab === 'carte') {
+                        await nextTick();
+                        // Nettoyer l'ancienne carte si elle existe
+                        cleanupMap();
+                        // Recréer après un court délai pour que le DOM soit prêt
+                        setTimeout(() => {
+                            initMap();
+                        }, 100);
+                    } else {
+                        const p = form.value.point;
+                        form.value = { ...baseForm, point: p };
+                        cancelEdit();
+                        await nextTick();
+                        updateChart();
+                    }
                 };
-                
-                const editMesure = (mesure) => { 
-                    form.value = { ...mesure }; 
-                    editingId.value = mesure.id; 
-                    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-                };
-                
-                const cancelEdit = () => { 
-                    const p = form.value.point; 
-                    form.value = { ...baseForm, point: p }; 
-                    editingId.value = null; 
-                };
+
+                const editMesure = (mesure) => { form.value = { ...mesure }; editingId.value = mesure.id; window.scrollTo({ top: 0, behavior: 'smooth' }); };
+                const cancelEdit = () => { const p = form.value.point; form.value = { ...baseForm, point: p }; editingId.value = null; };
 
                 const deleteMesure = async (id) => {
                     if(confirm("Êtes-vous sûr de vouloir supprimer cette mesure ?")) {
@@ -620,6 +544,7 @@
                         db.value[activeTab.value] = db.value[activeTab.value].filter(m => m.id !== id);
                         saveData();
                         updateChart();
+                        updateCarte();
                     }
                 };
 
@@ -634,18 +559,12 @@
                         vent: form.value.vent,
                         remarques: form.value.remarques
                     };
-
-
-                    // Conserver l'heure originale si on modifie, sinon créer une nouvelle heure
                     if (editingId.value) {
-                        // Récupérer l'heure originale depuis la base de données locale
                         const mesureOriginale = db.value[activeTab.value].find(m => m.id === editingId.value);
                         payload.heure = mesureOriginale ? mesureOriginale.heure : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     } else {
                         payload.heure = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     }
-
-
                     if (activeTab.value === 'surface') {
                         payload.tSurface = form.value.tSurface === "" ? null : parseFloat(form.value.tSurface);
                         payload.numPhoto = (form.value.numPhoto !== '' && !isNaN(form.value.numPhoto)) ? Number(form.value.numPhoto) : null;
@@ -665,10 +584,7 @@
                 };
 
                 const saveMesure = async () => {
-                    if (activeTab.value === 'air' && pressionInvalide.value) {
-                        alert("La pression atmosphérique est invalide. Veuillez entrer une valeur entre 900 et 1100 Pa.");
-                        return;
-                    }
+                    if (activeTab.value === 'air' && pressionInvalide.value) { alert("La pression atmosphérique est invalide. Veuillez entrer une valeur entre 900 et 1100 Pa."); return; }
                     isLoading.value = true;
                     
                     let payload = buildPayloadForDB();
@@ -678,46 +594,23 @@
                     if (editingId.value) {
                         if (isCloudActive.value) {
                             const table = activeTab.value === 'surface' ? 'campagne_surface' : 'campagne_air';
-                            const { data, error } = await supabaseClient
-                                .from(table)
-                                .update(payload)
-                                .eq('id', editingId.value)
-                                .select();
-                            
-                            if (error) {
-                                console.error('Erreur Supabase UPDATE:', error);
-                                alert("⚠️ Erreur Supabase (Modification) :\nCode: " + error.code + "\nMessage: " + error.message);
-                            } else {
-                                cloudSuccess = true;
-                            }
+                            const { data, error } = await supabaseClient.from(table).update(payload).eq('id', editingId.value).select();
+                            if (error) { console.error('Erreur Supabase UPDATE:', error); alert("⚠️ Erreur Supabase (Modification) :\nCode: " + error.code + "\nMessage: " + error.message); } 
+                            else { cloudSuccess = true; }
                         }
-                        
                         const index = db.value[activeTab.value].findIndex(m => m.id === editingId.value);
-                        if (index !== -1) {
-                            db.value[activeTab.value][index] = { ...db.value[activeTab.value][index], ...payload };
-                        }
+                        if (index !== -1) db.value[activeTab.value][index] = { ...db.value[activeTab.value][index], ...payload };
                         successMessage.value = cloudSuccess ? "Modifications enregistrées sur le serveur." : "Modifications enregistrées en local.";
-
                     } else {
                         payload.id = Date.now().toString();
                         const now = new Date();
                         payload.heure = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-                        
                         if (isCloudActive.value) {
                             const table = activeTab.value === 'surface' ? 'campagne_surface' : 'campagne_air';
-                            const { data, error } = await supabaseClient
-                                .from(table)
-                                .insert([payload])
-                                .select();
-                            
-                            if (error) {
-                                console.error('Erreur Supabase INSERT:', error);
-                                alert("⚠️ Erreur Supabase (Création) :\nCode: " + error.code + "\nMessage: " + error.message);
-                            } else {
-                                cloudSuccess = true;
-                            }
+                            const { data, error } = await supabaseClient.from(table).insert([payload]).select();
+                            if (error) { console.error('Erreur Supabase INSERT:', error); alert("⚠️ Erreur Supabase (Création) :\nCode: " + error.code + "\nMessage: " + error.message); } 
+                            else { cloudSuccess = true; }
                         }
-                        
                         db.value[activeTab.value].push(payload);
                         successMessage.value = cloudSuccess ? "Mesure synchronisée sur le serveur." : "Mesure enregistrée en local uniquement.";
                     }
@@ -730,20 +623,18 @@
                     
                     await nextTick();
                     updateChart();
+                    updateCarte();
 
                     if (isEditing) {
-                        // Modification : garder le point, juste réinitialiser le reste du formulaire
                         cancelEdit();
-                        setTimeout(() => {
-                            showSuccess.value = false;
-                        }, 3000);
+                        setTimeout(() => { showSuccess.value = false; }, 3000);
                     } else {
-                        // Nouvelle saisie : laisser voir le graphique 4 secondes, puis vider le point
                         setTimeout(() => {
                             form.value.point = '';
                             cancelEdit();
                             showSuccess.value = false;
                             updateChart();
+                            updateCarte();
                         }, 4000);
                     }
                 };
@@ -751,62 +642,421 @@
                 const updateChart = () => {
                     const ctx = document.getElementById('myChart');
                     if (!ctx || !form.value.point) return;
-                    
                     const hist = [...pointHistorique.value].sort((a, b) => a.heure.localeCompare(b.heure));
                     if (chartInstance) chartInstance.destroy();
-                    
                     if (activeTab.value === 'surface') {
-                        chartInstance = new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: hist.map(m => m.heure),
-                                datasets: [{
-                                    label: 'T° Surface',
-                                    data: hist.map(m => m.tSurface),
-                                    borderColor: '#f97316',
-                                    tension: 0.1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: { legend: { display: true } }
-                            }
-                        });
+                        chartInstance = new Chart(ctx, { type: 'line', data: { labels: hist.map(m => m.heure), datasets: [{ label: 'T° Surface', data: hist.map(m => m.tSurface), borderColor: '#f97316', tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
                     } else {
                         const datasets = [];
                         for (const param of listeParametresAir) {
                             if (parametresAirAffiches.value.includes(param.key)) {
-                                datasets.push({
-                                    label: param.label,
-                                    data: hist.map(m => m[param.key]),
-                                    borderColor: param.couleur,
-                                    tension: 0.1,
-                                    pointRadius: 2,
-                                    fill: false
-                                });
+                                datasets.push({ label: param.label, data: hist.map(m => m[param.key]), borderColor: param.couleur, tension: 0.1, pointRadius: 2, fill: false });
                             }
                         }
-                        
-                        if (datasets.length === 0) {
-                            chartInstance = null;
-                            return;
-                        }
-                        
-                        chartInstance = new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: hist.map(m => m.heure),
-                                datasets: datasets
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: { legend: { display: true } }
-                            }
-                        });
+                        if (datasets.length === 0) { chartInstance = null; return; }
+                        chartInstance = new Chart(ctx, { type: 'line', data: { labels: hist.map(m => m.heure), datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
                     }
                 };
+
+                // --- Fonctions Carte ---
+                const getColorForValue = (value) => {
+                    if (value === null || value === undefined) return '#cccccc';
+                    // Dégradé du bleu (froid) au rouge (chaud)
+                    const min = 10, max = 45;
+                    const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
+                    const r = Math.round(ratio * 255);
+                    const b = Math.round((1 - ratio) * 255);
+                    const g = Math.round(128 - ratio * 128);
+                    return `rgb(${r}, ${g}, ${b})`;
+                };
+
+                const getDataForPoint = (pointId, type, date, heure) => {
+                    const data = db.value[type === 'tSurface' ? 'surface' : 'air'];
+                    const mesures = data.filter(m => 
+                        m.point === pointId && 
+                        m.etablissement === etablissement.value && 
+                        m.date === date
+                    );
+                    if (mesures.length === 0) return null;
+                    // Trouver la mesure avec l'heure la plus proche de celle demandée
+                    const heureStr = String(heure).padStart(2, '0') + ':00';
+                    let closest = null;
+                    let minDiff = Infinity;
+                    for (const m of mesures) {
+                        if (!m.heure) continue;
+                        const [h, min] = m.heure.split(':').map(Number);
+                        const mHeure = h + min/60;
+                        const diff = Math.abs(mHeure - heure);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = m;
+                        }
+                    }
+                    // Si diff > 2h, on ignore
+                    if (minDiff > 2) return null;
+                    const val = closest ? closest[type] : null;
+                    return val !== undefined && val !== null ? val : null;
+                };
+
+                const updateCarte = () => {
+                    if (!mapInstance || activeTab.value !== 'carte') {
+                        return;
+                    }
+                    
+                    const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
+                    if (!etab) {
+                        console.warn('Établissement non trouvé:', etablissement.value);
+                        return;
+                    }
+
+                    const pointsData = [];
+                    for (const p of etab.points) {
+                        // Vérifiez que les coordonnées existent et sont valides
+                        if (!p.lat || !p.lng) {
+                            console.warn(`Point ${p.id} sans coordonnées`);
+                            continue;
+                        }
+                        
+                        // Vérifiez que les coordonnées sont dans une plage valide
+                        if (isNaN(p.lat) || isNaN(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
+                            console.warn(`Coordonnées invalides pour le point ${p.id}: lat=${p.lat}, lng=${p.lng}`);
+                            continue;
+                        }
+                        
+                        const val = getDataForPoint(p.id, carteType.value, dateCampagne.value, carteHeure.value);
+                        pointsData.push({
+                            id: p.id,
+                            lat: p.lat,
+                            lng: p.lng,
+                            localisation: p.localisation || '',
+                            valeur: val
+                        });
+                    }
+                    
+                    console.log(`Points avec données: ${pointsData.length}`, pointsData);
+                    pointsAvecDonnees.value = pointsData;
+
+                    // Supprimer les anciens marqueurs
+                    mapMarkers.forEach(marker => {
+                        if (mapInstance) mapInstance.removeLayer(marker);
+                    });
+                    mapMarkers = [];
+
+                    if (pointsData.length === 0) {
+                        console.warn('Aucun point valide à afficher sur la carte');
+                        return;
+                    }
+
+                    for (const point of pointsData) {
+                        const color = getColorForValue(point.valeur);
+                        const popupContent = `
+                            <div class="font-bold">Point ${point.id}</div>
+                            <div>${point.localisation || ''}</div>
+                            <div class="text-lg font-bold" style="color: ${color}">${point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A'}</div>
+                            <div class="text-xs text-gray-500">${dateCampagne.value} - ${carteHeure.value}:00</div>
+                        `;
+                        
+                        const marker = L.circleMarker([point.lat, point.lng], {
+                            radius: 12,
+                            fillColor: color,
+                            color: '#ffffff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.85
+                        }).bindPopup(popupContent);
+
+                        // Ajouter l'événement click pour ouvrir le popup
+                        marker.on('click', function() {
+                            this.openPopup();
+                        });
+
+                        marker.bindTooltip(
+                            `Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A'}`,
+                            { permanent: false, direction: 'top' }
+                        );
+                                                                        
+                        const label = L.marker([point.lat, point.lng], {
+                            icon: L.divIcon({
+                                className: 'point-label',
+                                html: `<div class="text-xs font-bold text-white bg-black bg-opacity-60 px-1.5 py-0.5 rounded text-center" style="margin-top: -28px; font-size: 10px;">${point.id}</div>`,
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            })
+                        });
+                        
+                        mapInstance.addLayer(label);
+                        mapMarkers.push(label);
+                        
+                        mapInstance.addLayer(marker);
+                        mapMarkers.push(marker);
+                    }
+                    
+                    // Ajustez la vue pour montrer tous les points
+                    if (pointsData.length > 0) {
+                        const group = L.featureGroup(mapMarkers);
+                        mapInstance.fitBounds(group.getBounds().pad(0.1));
+                    }
+                    updateLegend();
+
+                };
+
+                const initMap = () => {
+                    // Nettoyer toute instance existante
+                    cleanupMap();
+
+                    const container = document.getElementById('map');
+                    if (!container) {
+                        console.warn('Container map non trouvé');
+                        return;
+                    }
+
+                    // S'assurer que le conteneur est visible et dimensionné
+                    container.style.display = 'block';
+                    container.style.height = '500px';
+                    container.style.width = '100%';
+
+                    const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
+                    const defaultCenter = [50.6178, 3.0754];
+                    const defaultZoom = 18;
+
+                    let center = defaultCenter;
+                    if (etab && etab.points.length > 0) {
+                        const validPoints = etab.points.filter(p => p.lat && p.lng);
+                        if (validPoints.length > 0) {
+                            const latSum = validPoints.reduce((s, p) => s + p.lat, 0);
+                            const lngSum = validPoints.reduce((s, p) => s + p.lng, 0);
+                            center = [latSum / validPoints.length, lngSum / validPoints.length];
+                        }
+                    }
+
+                    try {
+                        mapInstance = L.map('map', {
+                            center: center,
+                            zoom: defaultZoom,
+                            zoomControl: false
+                        });
+
+                        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                            maxZoom: 20,
+                            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                            attribution: 'Google Satellite'
+                        }).addTo(mapInstance);
+
+                        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+
+                        // Une seule invalidation après la création
+                        setTimeout(() => {
+                            if (mapInstance) {
+                                mapInstance.invalidateSize();
+                                updateCarte();
+                            }
+                        }, 300);
+
+                    } catch (error) {
+                        console.error('Erreur initialisation carte:', error);
+                    }
+                };
+
+                const toggleAnimation = () => {
+                    animationActive.value = !animationActive.value;
+                    if (animationActive.value) {
+                        startAnimation();
+                    } else {
+                        stopAnimation();
+                    }
+                };
+
+
+                const forceReloadData = async () => {
+                    if (isCloudActive.value) {
+                        await loadEtablissementsCloud();
+                        await loadCloudData();
+                        if (activeTab.value === 'carte') {
+                            setTimeout(() => {
+                                initMap();
+                                updateCarte();
+                            }, 200);
+                        }
+                    }
+                };
+
+
+
+                
+                // Fonction pour nettoyer proprement la carte
+                const cleanupMap = () => {
+                    if (mapInstance) {
+                        // Supprimer tous les marqueurs
+                        mapMarkers.forEach(marker => {
+                            if (mapInstance) mapInstance.removeLayer(marker);
+                        });
+                        mapMarkers = [];
+                        
+                        // Supprimer la carte
+                        mapInstance.remove();
+                        mapInstance = null;
+                    }
+                };
+
+                // Appeler cette fonction quand on change d'établissement ou qu'on quitte la page
+                onUnmounted(() => {
+                    stopAnimation();
+                    cleanupMap();
+                });
+
+                const forceRefreshMap = () => {
+                    console.log('Force refresh de la carte');
+                    const container = document.getElementById('map');
+                    if (!container) return;
+                    
+                    container.style.display = 'block';
+                    container.style.height = '500px';
+                    container.style.width = '100%';
+                    
+                    if (mapInstance) {
+                        // Forcer un resize et un re-rendu
+                        mapInstance.invalidateSize();
+                        setTimeout(() => {
+                            mapInstance.invalidateSize();
+                            updateCarte();
+                            // Ajuster la vue sur les points
+                            if (pointsAvecDonnees.value.length > 0) {
+                                const markers = [];
+                                pointsAvecDonnees.value.forEach(p => {
+                                    markers.push(L.marker([p.lat, p.lng]));
+                                });
+                                if (markers.length > 0) {
+                                    const group = L.featureGroup(markers);
+                                    mapInstance.fitBounds(group.getBounds().pad(0.1));
+                                }
+                            }
+                        }, 200);
+                    } else {
+                        initMap();
+                    }
+                };
+
+                const updateLegend = () => {
+                    const legendGradient = document.getElementById('legend-gradient');
+                    const legendMin = document.getElementById('legend-min');
+                    const legendMax = document.getElementById('legend-max');
+
+                    if (!legendGradient) return;
+
+                    // Récupérer toutes les mesures pour la date, l'établissement et le type sélectionné
+                    const type = carteType.value; // 'tSurface', 'tAir', ou 'wbgt'
+                    const table = type === 'tSurface' ? 'surface' : 'air';
+                    const allMesures = db.value[table].filter(m => 
+                        m.etablissement === etablissement.value && 
+                        m.date === dateCampagne.value &&
+                        m[type] !== null && m[type] !== undefined
+                    );
+
+                    const temps = allMesures.map(m => m[type]);
+
+                    if (temps.length === 0) {
+                        legendGradient.style.background = 'linear-gradient(to right, #cccccc, #cccccc)';
+                        legendMin.textContent = 'N/A';
+                        legendMax.textContent = 'N/A';
+                        return;
+                    }
+
+                    const min = Math.min(...temps);
+                    const max = Math.max(...temps);
+                    const displayMin = Math.floor(min);
+                    const displayMax = Math.ceil(max);
+
+                    legendMin.textContent = displayMin;
+                    legendMax.textContent = displayMax;
+
+                    const steps = 10;
+                    let gradient = 'linear-gradient(to right';
+                    for (let i = 0; i <= steps; i++) {
+                        const ratio = i / steps;
+                        const value = displayMin + ratio * (displayMax - displayMin);
+                        const color = getColorForValue(value);
+                        const percent = (ratio * 100).toFixed(0);
+                        gradient += `, ${color} ${percent}%`;
+                    }
+                    gradient += ')';
+                    legendGradient.style.background = gradient;
+                };
+
+
+
+
+                watch(etablissement, () => {
+                    if (activeTab.value === 'carte') {
+                        // Réinitialiser la carte quand l'établissement change
+                        if (mapInstance) {
+                            // On détruit et recrée pour éviter les problèmes de cache
+                            mapInstance.remove();
+                            mapInstance = null;
+                            mapMarkers = [];
+                        }
+                        setTimeout(() => {
+                            initMap();
+                            updateCarte();
+                        }, 200);
+                    }
+                });
+
+                // Watcher pour la date avec refresh
+                watch(dateCampagne, () => { 
+                    if (activeTab.value === 'carte') {
+                        setTimeout(() => {
+                            if (mapInstance) {
+                                mapInstance.invalidateSize();
+                                updateCarte();
+                            }
+                        }, 100);
+                    }
+                });
+
+                // Watcher pour le type de température
+                watch(carteType, () => { 
+                    if (activeTab.value === 'carte') {
+                        updateCarte(); 
+                    }
+                });
+
+                // Watcher pour l'heure
+                watch(carteHeure, () => { 
+                    if (activeTab.value === 'carte') {
+                        updateCarte(); 
+                    }
+                });
+
+                const startAnimation = () => {
+                    if (animationInterval) clearInterval(animationInterval);
+                    animationInterval = setInterval(() => {
+                        let h = carteHeure.value + 1;
+                        if (h > 23) h = 0;
+                        carteHeure.value = h;
+                        updateCarte();
+                    }, 1500); // Change d'heure toutes les 1.5 secondes
+                };
+
+                const stopAnimation = () => {
+                    if (animationInterval) {
+                        clearInterval(animationInterval);
+                        animationInterval = null;
+                    }
+                };
+
+                // Watch pour mettre à jour la carte quand l'heure change
+                watch(carteHeure, () => { if (activeTab.value === 'carte') updateCarte(); });
+                watch(carteType, () => { if (activeTab.value === 'carte') updateCarte(); });
+                watch(dateCampagne, () => { if (activeTab.value === 'carte') updateCarte(); });
+
+                // Nettoyage
+                onUnmounted(() => {
+                    stopAnimation();
+                    if (mapInstance) {
+                        mapInstance.remove();
+                        mapInstance = null;
+                    }
+                });
 
                 onMounted(() => {
                     const saved = localStorage.getItem('mesures_db_v6');
@@ -816,7 +1066,14 @@
                     
                     window.addEventListener('online', () => { isOnline.value = true; loadCloudData(); });
                     window.addEventListener('offline', () => { isOnline.value = false; });
-                    
+                    window.addEventListener('resize', () => {
+                        if (activeTab.value === 'carte' && mapInstance) {
+                            setTimeout(() => {
+                                mapInstance.invalidateSize();
+                            }, 200);
+                        }
+                    });
+
                     if (isOnline.value) { loadCloudData(); loadEtablissementsCloud(); }
                 });
 
@@ -825,34 +1082,37 @@
                     pointHistorique, editingId, isCloudActive, isLoading, 
                     parametresAirAffiches, listeParametresAir, pressionInvalide, showMeteo, exportToExcel,
                     switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
-                    updateChart, onEtablissementChange, loadCloudData,
+                    updateChart, onEtablissementChange, onDateChange, loadCloudData,
                     menuOpen, showGestion, etablissementsData, listeEtablissements,
                     datesCampagne,
                     openGestionEtablissements, sauvegarderEtablissements,
                     ajouterEtablissement, supprimerEtablissement,
-                    ajouterPoint, supprimerPoint
+                    ajouterPoint, supprimerPoint,
+                    // Carte
+                    carteType, carteHeure, animationActive, pointsAvecDonnees,
+                    getColorForValue, updateCarte, initMap, toggleAnimation,
+                    forceRefreshMap // <-- Ajouter cette ligne
                 };
             }
         }).mount('#app');
     </script>
 
-    <!-- Service worker avec auto-update -->
     <script>
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/suivi-thermique/sw.js')
-            .then(registration => {
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            window.location.reload();
-                        }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/suivi-thermique/sw.js')
+                .then(registration => {
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                window.location.reload();
+                            }
+                        });
                     });
-                });
-                registration.update();
-            })
-            .catch(() => {});
-    }
+                    registration.update();
+                })
+                .catch(() => {});
+        }
     </script>
 </body>
 </html>
