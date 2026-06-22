@@ -22,10 +22,13 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     
     <style>
+        #map {
+            position: relative !important;
+            z-index: 1;
+        }
         .leaflet-container {
-            height: 100%;
-            width: 100%;
-            border-radius: 12px;
+            position: relative !important;
+            z-index: 1;
         }
         .timeline-slider {
             accent-color: #1e293b;
@@ -36,6 +39,13 @@
         .point-marker:hover {
             transform: scale(1.2);
             z-index: 1000;
+        }
+        /* Le wrapper de la carte doit avoir overflow:hidden (déjà présent) */
+        .bg-white.rounded-xl.overflow-hidden {
+            overflow: hidden !important;
+        }
+        .point-label {
+            pointer-events: none !important; /* les clics traversent vers le marqueur */
         }
     </style>
 </head>
