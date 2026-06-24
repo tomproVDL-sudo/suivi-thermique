@@ -72,6 +72,7 @@
                             <button @click="showMeteo = 'TL'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo Thierry Launay</button>
                             <button @click="showMeteo = 'JJR'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo Jean Jacques Rousseau</button>
                             <button @click="showMeteo = 'MF'; menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">🌤️ Météo France</button>
+                            <button @click="triggerFileInput(); menuOpen=false" class="block w-full text-left px-4 py-2 hover:bg-gray-100">📤 Importer Excel</button>
                         </div>
                     </div>
                 </div>
@@ -96,6 +97,8 @@
                     </div>
                 </div>
             </div>
+            <input type="file" ref="fileInput" accept=".xlsx,.xls" style="display:none" @change="importExcel($event)">
+
         </header>
 
         <!-- Modal gestion établissements -->
@@ -115,6 +118,21 @@
                         <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex gap-2 items-center mb-1 ml-2">
                             <input v-model="point.id" placeholder="N°" class="w-16 border p-1 rounded text-xs">
                             <input v-model="point.localisation" placeholder="Localisation" class="flex-1 border p-1 rounded text-xs">
+                                   <!-- Nom des surfaces-->
+                            <select v-model="point.surfaceType" class="w-20 border p-1 rounded text-xs bg-white">
+                                <option value="bitume">Bitume</option>
+                                <option value="pelouse">Pelouse</option>
+                                <option value="dalles">Dalles</option>
+                                <option value="pavedrainant">Pavé drainant</option>
+                                <option value="terre">Terre</option>
+                                <option value="terrebattue">Terre battue</option>
+                                <option value="bois">Bois</option>
+                                <option value="Copeauxbois">Copeaux de bois</option>
+                                <option value="herbe">Herbe</option>
+                            </select>
+                            
+                            
+                            
                             <input v-model="point.lat" placeholder="Lat" class="w-20 border p-1 rounded text-xs" type="number" step="0.000001">
                             <input v-model="point.lng" placeholder="Lng" class="w-20 border p-1 rounded text-xs" type="number" step="0.000001">
                             <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-xs">✕</button>
@@ -133,7 +151,7 @@
         <nav class="flex border-b border-gray-200 bg-gray-50">
             <button @click="switchTab('surface')" :class="activeTab === 'surface' ? 'border-b-4 border-orange-500 text-orange-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Surface</button>
             <button @click="switchTab('air')" :class="activeTab === 'air' ? 'border-b-4 border-blue-500 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Air & WBGT</button>
-            <button @click="switchTab('carte')" :class="activeTab === 'carte' ? 'border-b-4 border-green-500 text-green-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">🗺️ Carte</button>
+            <button @click="switchTab('carte')" :class="activeTab === 'carte' ? 'border-b-4 border-green-500 text-green-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Analyse</button>
         </nav>
 
         <main class="p-4 space-y-6">
@@ -222,7 +240,7 @@
                                 <div>
                                     <div class="font-bold text-sm text-gray-800">{{ mesure.heure }}</div>
                                     <div class="text-xs text-gray-500">
-                                        <span v-if="activeTab === 'surface'">T°: {{ mesure.tSurface }}°C</span>
+                                        <span v-if="activeTab === 'surface'">T°: {{ mesure.tSurface }}°C | 🧱 {{ formatSurfaceName(etablissementsData.find(e => e.nom === mesure.etablissement)?.points.find(p => p.id === mesure.point)?.surfaceType) }}</span>
                                         <span v-else>Air: {{ mesure.tAir }}°C | WBGT: {{ mesure.wbgt }}°C</span>
                                     </div>
                                 </div>
@@ -237,15 +255,19 @@
             </div>
 
             <!-- Onglet Carte -->
-            <div v-if="activeTab === 'carte'" class="space-y-4">
-                <!-- Contrôles -->
-                <div class="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
+            <div v-if="activeTab === 'carte'" class="space-y-4"> <div class="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-bold text-gray-700">Type:</label>
                         <select v-model="carteType" class="p-2 border rounded text-sm bg-white">
                             <option value="tSurface">T° Surface</option>
                             <option value="tAir">T° Air</option>
                             <option value="wbgt">WBGT</option>
+                            <option value="wb">WB</option>
+                            <option value="hi">HI</option>
+                            <option value="hr">HR (%)</option>
+                            <option value="gt">GT</option>
+                            <option value="dpt">DPT</option>
+                            <option value="pression">Pression</option>
                         </select>
                     </div>
                     <div class="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -264,10 +286,9 @@
                 <!-- Carte avec légende superposée -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm" style="position: relative; min-height: 500px; overflow: hidden;">                    
                     <div id="map" style="height: 500px; width: 100%; min-height: 500px;"></div>
-                    
-                    <!-- Légende de température (superposée en bas à droite) -->
+
                     <div id="temperature-legend" style="position: absolute; bottom: 20px; right: 20px; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000; width: 160px; pointer-events: none;">
-                        <div style="font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 4px;">Température (°C)</div>
+                        <div id="legend-title" style="font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 4px;">Température (°C)</div>
                         <div id="legend-gradient" style="height: 20px; width: 100%; border-radius: 4px;"></div>
                         <div style="display: flex; justify-content: space-between; font-size: 10px; margin-top: 2px;">
                             <span id="legend-min">10</span>
@@ -279,9 +300,16 @@
                 <!-- Légende des points (existante) -->
                 <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4 justify-center">
                     <span v-for="point in pointsAvecDonnees" :key="point.id" class="flex items-center gap-1">
-                        <span class="w-3 h-3 rounded-full inline-block" :style="{ backgroundColor: getColorForValue(point.valeur) }"></span>
-                        Point {{ point.id }}: {{ point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A' }}
+                        <span class="w-3 h-3 rounded-full inline-block" :style="{ backgroundColor: getColorForValue(point.valeur, carteType) }"></span>
+                        Point {{ point.id }}: {{ point.valeur != null ? point.valeur.toFixed(1) + ' ' + getUnit(carteType) : 'N/A' }}
                     </span>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mt-4">
+                    <h3 class="text-sm font-bold text-gray-700 mb-2 text-center">Évolution temporelle comparée (Points)</h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="carteChart"></canvas>
+                    </div>
                 </div>
             </div>
             
@@ -289,7 +317,7 @@
 
         <!-- Modale météo -->
         <div v-if="showMeteo" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">
-            <div class="w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+            <div class="w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl">
                 <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
                     <h2 class="text-sm font-bold">{{ showMeteo === 'TL' ? 'Météo Thierry Launay' : (showMeteo === 'JJR' ? 'Météo Jean Jacques Rousseau' : 'Météo-France') }}</h2>
                     <button @click="showMeteo = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
@@ -371,6 +399,7 @@
                 const showMeteo = ref(false);
 
                 let chartInstance = null;
+                let carteChartInstance = null; // Nouvelle instance pour le graphique de la carte
                 let mapInstance = null;
                 let mapMarkers = [];
                 let animationInterval = null;
@@ -468,7 +497,15 @@
 
                 const ajouterEtablissement = () => etablissementsData.value.push({ nom: '', points: [] });
                 const supprimerEtablissement = (index) => { if (confirm("Supprimer cet établissement et tous ses points ?")) etablissementsData.value.splice(index, 1); };
-                const ajouterPoint = (indexEtab) => etablissementsData.value[indexEtab].points.push({ id: '', localisation: '', lat: null, lng: null });
+                const ajouterPoint = (indexEtab) => { 
+                    etablissementsData.value[indexEtab].points.push({ 
+                        id: '', 
+                        localisation: '', 
+                        lat: null, 
+                        lng: null, 
+                        surfaceType: 'bitume' // Valeur par défaut
+                    }); 
+                };                
                 const supprimerPoint = (indexEtab, indexPoint) => etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
                 const openGestionEtablissements = () => { menuOpen.value = false; showGestion.value = true; };
 
@@ -533,6 +570,8 @@
                         // Recréer après un court délai pour que le DOM soit prêt
                         setTimeout(() => {
                             initMap();
+                            updateCarte();
+                            updateCarteChart();
                         }, 100);
                     } else {
                         const p = form.value.point;
@@ -669,17 +708,176 @@
                         chartInstance = new Chart(ctx, { type: 'line', data: { labels: hist.map(m => m.heure), datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
                     }
                 };
+                const updateCarteChart = () => {
+                    const ctx = document.getElementById('carteChart');
+                    if (!ctx || activeTab.value !== 'carte') return;
+
+                    if (carteChartInstance) {
+                        carteChartInstance.destroy();
+                    }
+
+                    const type = carteType.value;
+                    const table = type === 'tSurface' ? 'surface' : 'air';
+                    const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
+                    if (!etab) return;
+
+                    const mesures = db.value[table].filter(m => 
+                        m.etablissement === etablissement.value && 
+                        m.date === dateCampagne.value &&
+                        m[type] !== null && m[type] !== undefined && m[type] !== ''
+                    );
+
+                    if (mesures.length === 0) return;
+
+                    const heuresSet = new Set();
+                    mesures.forEach(m => { if(m.heure) heuresSet.add(m.heure); });
+                    const labels = Array.from(heuresSet).sort((a, b) => a.localeCompare(b));
+
+                    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1', '#14b8a6', '#f43f5e'];
+
+                    const datasets = [];
+                    
+                    etab.points.forEach((p, index) => {
+                        const mesuresPoint = mesures.filter(m => m.point === p.id);
+                        if (mesuresPoint.length === 0) return;
+
+                        const data = labels.map(heure => {
+                            const m = mesuresPoint.find(mp => mp.heure === heure);
+                            return m ? parseFloat(m[type]) : null;
+                        });
+
+                        const surfaceNom = formatSurfaceName(p.surfaceType);
+                        
+                        datasets.push({
+                            label: `Point ${p.id} (${p.localisation || ''} - ${surfaceNom})`,
+                            data: data, // ⬅️ C'était cette ligne manquante !
+                            borderColor: colors[index % colors.length],
+                            backgroundColor: colors[index % colors.length],
+                            tension: 0.1,
+                            spanGaps: true,
+                            pointRadius: 3
+                        });
+                    });
+
+                    carteChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                            },
+                            scales: {
+                                y: {
+                                    title: { display: true, text: `${getLabel(type)} (${getUnit(type)})` }
+                                }
+                            }
+                        }
+                    });
+
+                    carteChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                            },
+                            scales: {
+                                y: {
+                                    title: { 
+                                        display: true, 
+                                        text: `${getLabel(type)} (${getUnit(type)})` 
+                                    }
+                                }
+                            }
+                        }
+                    });
+                };
+
+
 
                 // --- Fonctions Carte ---
-                const getColorForValue = (value) => {
+                // --- Utilitaires Dynamiques pour la Carte ---
+                const getUnit = (type) => {
+                    if (type === 'hr') return '%';
+                    if (type === 'pression') return 'Pa';
+                    return '°C';
+                };
+
+                const formatSurfaceName = (val) => {
+                    if (!val) return 'Inconnu';
+                    const mapping = {
+                        'bitume': 'Bitume',
+                        'pelouse': 'Pelouse',
+                        'dalles': 'Dalles',
+                        'pavedrainant': 'Pavé drainant',
+                        'terre': 'Terre',
+                        'terrebattue': 'Terre battue',
+                        'bois': 'Bois',
+                        'copeauxbois': 'Copeaux de bois',
+                        'herbe': 'Herbe'
+                    };
+                    return mapping[val] || val.charAt(0).toUpperCase() + val.slice(1);
+                };
+
+
+                const getSurfaceName = (pointId) => {
+                    const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
+                    if (!etab) return '';
+                    const point = etab.points.find(p => p.id === pointId);
+                    return point && point.surfaceType ? point.surfaceType : 'Inconnu';
+                };
+
+
+                const getLabel = (type) => {
+                    const labels = {
+                        tSurface: 'T° Surface', tAir: 'T° Air', wbgt: 'WBGT',
+                        wb: 'WB', hi: 'HI', hr: 'HR', gt: 'GT', dpt: 'DPT', pression: 'Pression'
+                    };
+                    return labels[type] || type;
+                };
+
+                const getColorBounds = (type) => {
+                    // On adapte les échelles min/max selon le paramètre
+                    if (type === 'hr') return { min: 20, max: 100 }; 
+                    if (type === 'pression') return { min: 980, max: 1030 };
+                    if (type === 'tSurface') return { min: 10, max: 60 }; // L'asphalte monte plus haut !
+                    return { min: 10, max: 45 }; // Plage par défaut pour T° Air, WBGT, etc.
+                };
+
+                const getColorForValue = (value, type) => {
                     if (value === null || value === undefined) return '#cccccc';
-                    // Dégradé du bleu (froid) au rouge (chaud)
-                    const min = 10, max = 45;
-                    const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
-                    const r = Math.round(ratio * 255);
-                    const b = Math.round((1 - ratio) * 255);
-                    const g = Math.round(128 - ratio * 128);
-                    return `rgb(${r}, ${g}, ${b})`;
+                    
+                    const bounds = getColorBounds(type);
+                    const ratio = Math.max(0, Math.min(1, (value - bounds.min) / (bounds.max - bounds.min)));
+                    
+                    // 1. Échelle "Surface" : Bleu -> Vert -> Rouge foncé
+                    if (type === 'tSurface') {
+                        let hue;
+                        if (ratio < 0.5) {
+                            // Transition Bleu (240°) vers Vert (120°)
+                            hue = 240 - (ratio * 2 * 120);
+                        } else {
+                            // Transition Vert (120°) vers Rouge (0°)
+                            hue = 120 - ((ratio - 0.5) * 2 * 120);
+                        }
+                        
+                        // Luminosité : 40% pour garder un aspect "foncé" et intense
+                        return `hsl(${hue}, 80%, 40%)`;
+                    }
+                    
+                    // 2. Échelle Air/WBGT : Classique (Bleu ciel vers Rouge vif)
+                    const hue = (1 - ratio) * 240; 
+                    return `hsl(${hue}, 100%, 50%)`;
                 };
 
                 const getDataForPoint = (pointId, type, date, heure) => {
@@ -760,11 +958,14 @@
                     }
 
                     for (const point of pointsData) {
-                        const color = getColorForValue(point.valeur);
+                        // On passe le type actuel à getColorForValue
+                        const color = getColorForValue(point.valeur, carteType.value);
+                        const unit = getUnit(carteType.value); // On récupère l'unité
+                        
                         const popupContent = `
                             <div class="font-bold">Point ${point.id}</div>
                             <div>${point.localisation || ''}</div>
-                            <div class="text-lg font-bold" style="color: ${color}">${point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A'}</div>
+                            <div class="text-lg font-bold" style="color: ${color}">${point.valeur != null ? point.valeur.toFixed(1) + ' ' + unit : 'N/A'}</div>
                             <div class="text-xs text-gray-500">${dateCampagne.value} - ${carteHeure.value}:00</div>
                         `;
                         
@@ -801,6 +1002,11 @@
                         
                         mapInstance.addLayer(marker);
                         mapMarkers.push(marker);
+
+                        marker.bindTooltip(
+                            `Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + ' ' + unit : 'N/A'}`,
+                            { permanent: false, direction: 'top' }
+                        );
                     }
                     
                     // Ajustez la vue pour montrer tous les points
@@ -952,18 +1158,22 @@
                     const legendGradient = document.getElementById('legend-gradient');
                     const legendMin = document.getElementById('legend-min');
                     const legendMax = document.getElementById('legend-max');
+                    const legendTitle = document.getElementById('legend-title'); // Nouveau
 
                     if (!legendGradient) return;
 
                     // Récupérer toutes les mesures pour la date, l'établissement et le type sélectionné
-                    const type = carteType.value; // 'tSurface', 'tAir', ou 'wbgt'
+                    const type = carteType.value;
                     const table = type === 'tSurface' ? 'surface' : 'air';
+                    
                     const allMesures = db.value[table].filter(m => 
                         m.etablissement === etablissement.value && 
                         m.date === dateCampagne.value &&
                         m[type] !== null && m[type] !== undefined
                     );
-
+                    if (legendTitle) {
+                        legendTitle.textContent = `${getLabel(type)} (${getUnit(type)})`;
+                    }
                     const temps = allMesures.map(m => m[type]);
 
                     if (temps.length === 0) {
@@ -986,7 +1196,8 @@
                     for (let i = 0; i <= steps; i++) {
                         const ratio = i / steps;
                         const value = displayMin + ratio * (displayMax - displayMin);
-                        const color = getColorForValue(value);
+                        // On passe bien le 'type' à la fonction de couleur
+                        const color = getColorForValue(value, type);
                         const percent = (ratio * 100).toFixed(0);
                         gradient += `, ${color} ${percent}%`;
                     }
@@ -1009,6 +1220,7 @@
                         setTimeout(() => {
                             initMap();
                             updateCarte();
+                            updateCarteChart();
                         }, 200);
                     }
                 });
@@ -1020,6 +1232,7 @@
                             if (mapInstance) {
                                 mapInstance.invalidateSize();
                                 updateCarte();
+                                updateCarteChart();
                             }
                         }, 100);
                     }
@@ -1029,6 +1242,7 @@
                 watch(carteType, () => { 
                     if (activeTab.value === 'carte') {
                         updateCarte(); 
+                        updateCarteChart();
                     }
                 });
 
@@ -1089,6 +1303,119 @@
                     if (isOnline.value) { loadCloudData(); loadEtablissementsCloud(); }
                 });
 
+                const fileInput = ref(null);
+
+                const triggerFileInput = () => {
+                    fileInput.value.click();
+                };
+
+                const importExcel = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    try {
+                        const data = await file.arrayBuffer();
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+                        if (rows.length === 0) {
+                            alert("Le fichier Excel est vide.");
+                            return;
+                        }
+
+                        // Détecter le type de données : surface ou air
+                        const isSurface = rows.some(row => row.hasOwnProperty('T° Surface (°C)'));
+                        const isAir = rows.some(row => row.hasOwnProperty('T° Air (°C)') || row.hasOwnProperty('WBGT (°C)'));
+
+                        if (!isSurface && !isAir) {
+                            alert("Format de fichier non reconnu. Assurez-vous d'exporter depuis l'application.");
+                            return;
+                        }
+
+                        const table = isSurface ? 'surface' : 'air';
+                        let count = 0;
+                        let skipped = 0;
+
+                        for (const row of rows) {
+                            // Construction de l'objet mesure en fonction des colonnes présentes
+                            const mesure = {
+                                id: Date.now().toString() + '_' + count, // génère un ID unique
+                                date: row.Date || '',
+                                heure: row.Heure || '',
+                                etablissement: row['Établissement'] || '',
+                                point: String(row.Point || ''),
+                                nuage: row.Nuage || 'Absent',
+                                ombre: row.Ombre || 'Absent',
+                                vent: row.Vent || 'Absent',
+                                remarques: row.Remarques || '',
+                            };
+
+                            if (isSurface) {
+                                mesure.tSurface = parseFloat(row['T° Surface (°C)']) || null;
+                                mesure.numPhoto = row['N° Photo'] ? parseInt(row['N° Photo']) : null;
+                            } else {
+                                mesure.tAir = parseFloat(row['T° Air (°C)']) || null;
+                                mesure.wbgt = parseFloat(row['WBGT (°C)']) || null;
+                                mesure.wb = parseFloat(row['WB (°C)']) || null;
+                                mesure.hi = parseFloat(row['HI (°C)']) || null;
+                                mesure.hr = parseFloat(row['HR (%)']) || null;
+                                mesure.gt = parseFloat(row['GT (°C)']) || null;
+                                mesure.dpt = parseFloat(row['DPT (°C)']) || null;
+                                mesure.pression = parseFloat(row['Pression (Pa)']) || null;
+                                mesure.numCapteur = row['N° Capteur'] ? parseInt(row['N° Capteur']) : null;
+                                mesure.numEnregAir = row['N° Enregistrement'] ? parseInt(row['N° Enregistrement']) : null;
+                            }
+
+                            // Vérifier les champs obligatoires
+                            if (!mesure.date || !mesure.etablissement || !mesure.point) {
+                                skipped++;
+                                continue;
+                            }
+
+                            // Vérifier que l'établissement existe dans la liste ; sinon, on l'ignore ou on l'ajoute ?
+                            const etabExists = etablissementsData.value.some(e => e.nom === mesure.etablissement);
+                            if (!etabExists) {
+                                skipped++;
+                                continue;
+                            }
+
+                            // Vérifier que le point existe pour cet établissement
+                            const etab = etablissementsData.value.find(e => e.nom === mesure.etablissement);
+                            const pointExists = etab.points.some(p => String(p.id) === mesure.point);
+                            if (!pointExists) {
+                                skipped++;
+                                continue;
+                            }
+
+                            // Ajouter dans la base locale
+                            db.value[table].push(mesure);
+
+                            // Si cloud actif, on insère aussi dans Supabase
+                            if (isCloudActive.value) {
+                                const supabaseTable = isSurface ? 'campagne_surface' : 'campagne_air';
+                                const { error } = await supabaseClient.from(supabaseTable).insert([mesure]);
+                                if (error) console.error("Erreur insertion Supabase:", error);
+                            }
+                            count++;
+                        }
+
+                        saveData();
+                        if (isCloudActive.value) await loadCloudData();
+
+                        alert(`Import terminé : ${count} mesure(s) ajoutée(s), ${skipped} ligne(s) ignorée(s).`);
+                        updateChart();
+                        updateCarte();
+                        event.target.value = ''; // réinitialiser l'input
+
+                    } catch (error) {
+                        console.error("Erreur lors de l'import:", error);
+                        alert("Erreur lors de l'import du fichier Excel.");
+                    }
+                };
+
+
+
                 return { 
                     activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, appVersion,
                     pointHistorique, editingId, isCloudActive, isLoading, 
@@ -1096,14 +1423,15 @@
                     switchTab, saveMesure, editMesure, deleteMesure, cancelEdit, 
                     updateChart, onEtablissementChange, onDateChange, loadCloudData,
                     menuOpen, showGestion, etablissementsData, listeEtablissements,
-                    datesCampagne,
+                    datesCampagne, updateCarteChart,formatSurfaceName,
                     openGestionEtablissements, sauvegarderEtablissements,
                     ajouterEtablissement, supprimerEtablissement,
-                    ajouterPoint, supprimerPoint,
+                    ajouterPoint, supprimerPoint,getSurfaceName,
                     // Carte
                     carteType, carteHeure, animationActive, pointsAvecDonnees,
                     getColorForValue, updateCarte, initMap, toggleAnimation,
-                    forceRefreshMap // <-- Ajouter cette ligne
+                    forceRefreshMap, getUnit, fileInput, triggerFileInput, importExcel// <-- Ajouter cette ligne
+                    
                 };
             }
         }).mount('#app');
