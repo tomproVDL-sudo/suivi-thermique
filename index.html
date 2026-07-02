@@ -118,25 +118,33 @@
                             <button @click="supprimerEtablissement(index)" class="text-red-600 hover:text-red-800 text-sm">🗑️</button>
                         </div>
                         <div class="text-xs text-gray-600 mb-1">Points :</div>
+                        
                         <!-- Ajout de flex-wrap pour permettre le retour à la ligne -->
-                        <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex flex-wrap gap-2 items-center mb-1 ml-2">
-                            <input v-model="point.id" placeholder="N°" class="w-20 border p-1 rounded text-xs">
-                            <input v-model="point.localisation" placeholder="Localisation" class="w-32 border p-1 rounded text-xs">
-                            <select v-model="point.surfaceType" class="w-32 border p-1 rounded text-xs bg-white">
-                                <option value="bitume">Bitume</option>
-                                <option value="pelouse">Pelouse</option>
-                                <option value="dalles">Dalles</option>
-                                <option value="pavedrainant">Pavé drainant</option>
-                                <option value="terre">Terre</option>
-                                <option value="terrebattue">Terre battue</option>
-                                <option value="bois">Bois</option>
-                                <option value="Copeauxbois">Copeaux de bois</option>
-                                <option value="herbe">Herbe</option>
-                            </select>
-                            <input v-model="point.lat" placeholder="Lat" class="w-32 border p-1 rounded text-xs" type="number" step="0.000001">
-                            <input v-model="point.lng" placeholder="Lng" class="w-32 border p-1 rounded text-xs" type="number" step="0.000001">
-                            <button @click="ouvrirSelecteurCarte(index, pIndex)" class="text-blue-500 hover:text-blue-700 ml-1 text-base" title="Pointer sur la carte">📍</button>
-                            <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-xs">✕</button>
+                        <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex flex-col md:flex-row gap-2 items-start md:items-center mb-3 md:mb-1 ml-2 pb-2 md:pb-0 border-b border-gray-100 md:border-none">
+                            
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <input v-model="point.id" placeholder="N°" class="w-12 border p-1 rounded text-xs shrink-0">
+                                <input v-model="point.localisation" placeholder="Localisation" class="flex-1 md:w-28 border p-1 rounded text-xs min-w-0">
+                                <select v-model="point.surfaceType" class="w-24 md:w-28 border p-1 rounded text-xs bg-white shrink-0 truncate">
+                                    <option value="bitume">Bitume</option>
+                                    <option value="pelouse">Pelouse</option>
+                                    <option value="dalles">Dalles</option>
+                                    <option value="pavedrainant">Pavé drainant</option>
+                                    <option value="terre">Terre</option>
+                                    <option value="terrebattue">Terre battue</option>
+                                    <option value="bois">Bois</option>
+                                    <option value="Copeauxbois">Copeaux de bois</option>
+                                    <option value="herbe">Herbe</option>
+                                </select>
+                            </div>
+
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <input v-model="point.lat" placeholder="Lat" class="flex-1 md:w-24 border p-1 rounded text-xs min-w-0" type="number" step="0.000001">
+                                <input v-model="point.lng" placeholder="Lng" class="flex-1 md:w-24 border p-1 rounded text-xs min-w-0" type="number" step="0.000001">
+                                <button @click="ouvrirSelecteurCarte(index, pIndex)" class="text-blue-500 hover:text-blue-700 text-lg px-1 shrink-0" title="Pointer sur la carte">📍</button>
+                                <button @click="supprimerPoint(index, pIndex)" class="text-red-500 text-sm px-1 shrink-0" title="Supprimer ce point">✕</button>
+                            </div>
+
                         </div>
                         <button @click="ajouterPoint(index)" class="text-xs text-gray-600 hover:underline mt-1">+ Ajouter un point</button>
                     </div>
@@ -153,6 +161,7 @@
             <button @click="switchTab('surface')" :class="activeTab === 'surface' ? 'border-b-4 border-orange-500 text-orange-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Surface</button>
             <button @click="switchTab('air')" :class="activeTab === 'air' ? 'border-b-4 border-blue-500 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Air & WBGT</button>
             <button @click="switchTab('carte')" :class="activeTab === 'carte' ? 'border-b-4 border-green-500 text-green-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Analyse</button>
+            <button @click="switchTab('comparaison')" :class="activeTab === 'comparaison' ? 'border-b-4 border-purple-500 text-purple-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Comparaison</button>
         </nav>
 
         <main class="p-4 space-y-6">
@@ -161,8 +170,7 @@
             </div>
 
             <!-- Contenu Surface / Air -->
-            <div v-if="activeTab !== 'carte'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+                <div v-if="activeTab === 'surface' || activeTab === 'air'" class="grid grid-cols-1 md:grid-cols-2 gap-6">                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
                     <div class="flex justify-between items-center mb-4 border-b pb-2">
                         <h2 class="text-lg font-bold" :class="activeTab === 'surface' ? 'text-orange-600' : 'text-blue-600'">
                             {{ editingId ? 'Modifier la mesure' : 'Nouvelle saisie' }}
@@ -313,6 +321,75 @@
                     </div>
                 </div>
             </div>
+
+
+
+            <div v-if="activeTab === 'comparaison'" class="space-y-6">
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 class="text-lg font-bold text-purple-600 mb-4 border-b pb-2">Comparer des campagnes existantes</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <h3 class="font-bold text-sm text-gray-700 mb-2">🔴 Campagne A</h3>
+                            <select v-model="compA.etablissement" @change="onCompAChange" class="w-full p-2 mb-2 border rounded bg-white text-sm">
+                                <option v-for="etab in listeEtablissements" :key="etab" :value="etab">{{ etab }}</option>
+                            </select>
+                            <select v-model="compA.date" @change="updateComparaisonChart" class="w-full p-2 border rounded bg-white text-sm" :disabled="datesDisponiblesA.length === 0">
+                                <option value="" disabled v-if="datesDisponiblesA.length === 0">Aucune donnée disponible</option>
+                                <option v-for="d in datesDisponiblesA" :key="d" :value="d">{{ d }}</option>
+                            </select>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <h3 class="font-bold text-sm text-gray-700 mb-2">🔵 Campagne B</h3>
+                            <select v-model="compB.etablissement" @change="onCompBChange" class="w-full p-2 mb-2 border rounded bg-white text-sm">
+                                <option v-for="etab in listeEtablissements" :key="etab" :value="etab">{{ etab }}</option>
+                            </select>
+                            <select v-model="compB.date" @change="updateComparaisonChart" class="w-full p-2 border rounded bg-white text-sm" :disabled="datesDisponiblesB.length === 0">
+                                <option value="" disabled v-if="datesDisponiblesB.length === 0">Aucune donnée disponible</option>
+                                <option v-for="d in datesDisponiblesB" :key="d" :value="d">{{ d }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row md:items-center gap-4 mb-4 bg-gray-50 p-3 rounded-lg border">
+                        <div class="flex items-center">
+                            <label class="text-xs font-bold text-gray-700 mr-2">Paramètre :</label>
+                            <select v-model="compParam" @change="updateComparaisonChart" class="p-2 border rounded bg-white text-sm">
+                                <optgroup label="Mesure de Surface">
+                                    <option value="tSurface">T° Surface</option>
+                                </optgroup>
+                                <optgroup label="Thermique Air & Confort">
+                                    <option value="tAir">T° Air</option>
+                                    <option value="wbgt">WBGT</option>
+                                    <option value="wb">WB</option>
+                                    <option value="hi">HI</option>
+                                    <option value="gt">GT</option>
+                                    <option value="dpt">DPT</option>
+                                </optgroup>
+                                <optgroup label="Conditions Atmosphériques">
+                                    <option value="hr">Humidité (HR %)</option>
+                                    <option value="pression">Pression (Pa)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center">
+                            <label class="text-xs font-bold text-gray-700 mr-2">Cibler un point :</label>
+                            <select v-model="compFiltrePoint" @change="updateComparaisonChart" class="p-2 border rounded bg-white text-sm">
+                                <option value="Tous">Tous les points</option>
+                                <option v-for="pt in listePointsComparaison" :key="pt" :value="pt">Point {{ pt }}</option>
+                            </select>
+                        </div>
+
+                        <span class="text-xs text-gray-500 ml-auto italic">💡 Cliquez sur la légende pour isoler des courbes.</span>
+                    </div>
+
+                    <div class="relative h-[500px] w-full">
+                        <canvas id="comparaisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
             
         </main>
 
@@ -428,6 +505,12 @@
                 const showGestion = ref(false);
                 const showMeteo = ref(false);
 
+                // --- Variables Comparaison ---
+                const compA = ref({ etablissement: 'Thierry Launay', date: dateCampagne.value });
+                const compB = ref({ etablissement: 'Jean Jacques Rousseau', date: dateCampagne.value });
+                const compParam = ref('tAir');
+                let comparaisonChartInstance = null;
+
                 let chartInstance = null;
                 let carteChartInstance = null; // Nouvelle instance pour le graphique de la carte
                 let mapInstance = null;
@@ -461,6 +544,47 @@
                 const tempLng = ref(null);
                 let pickerMapInstance = null;
                 let pickerMarker = null;
+
+                // NOUVEAU : Variables pour le filtrage par point
+                const compFiltrePoint = ref('Tous');
+                const listePointsComparaison = computed(() => {
+                    const points = new Set();
+                    const etabA = etablissementsData.value.find(e => e.nom === compA.value.etablissement);
+                    const etabB = etablissementsData.value.find(e => e.nom === compB.value.etablissement);
+                    
+                    if (etabA) etabA.points.forEach(p => points.add(p.id));
+                    if (etabB) etabB.points.forEach(p => points.add(p.id));
+                    
+                    // Tri naturel pour avoir Point 1, Point 2, Point 10 dans le bon ordre
+                    return Array.from(points).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+                });
+                
+                // NOUVEAU : Calculer les dates qui contiennent réellement de la donnée
+                const datesDisponiblesA = computed(() => {
+                    const dates = new Set();
+                    [...db.value.surface, ...db.value.air].forEach(m => {
+                        if (m.etablissement === compA.value.etablissement && m.date) dates.add(m.date);
+                    });
+                    return Array.from(dates).sort((a,b) => b.localeCompare(a));
+                });
+
+                const datesDisponiblesB = computed(() => {
+                    const dates = new Set();
+                    [...db.value.surface, ...db.value.air].forEach(m => {
+                        if (m.etablissement === compB.value.etablissement && m.date) dates.add(m.date);
+                    });
+                    return Array.from(dates).sort((a,b) => b.localeCompare(a));
+                });
+
+                // NOUVEAU : Auto-sélection de la date la plus récente au changement d'établissement
+                const onCompAChange = () => {
+                    compA.value.date = datesDisponiblesA.value.length > 0 ? datesDisponiblesA.value[0] : '';
+                    updateComparaisonChart();
+                };
+                const onCompBChange = () => {
+                    compB.value.date = datesDisponiblesB.value.length > 0 ? datesDisponiblesB.value[0] : '';
+                    updateComparaisonChart();
+                };
 
 
                 const etablissementsDefaut = [
@@ -613,6 +737,9 @@
                             updateCarte();
                             updateCarteChart();
                         }, 100);
+                    } else if (tab === 'comparaison') {
+                        await nextTick();
+                        updateComparaisonChart();
                     } else {
                         const p = form.value.point;
                         form.value = { ...baseForm, point: p };
@@ -1308,6 +1435,126 @@
                     }
                 };
 
+                const updateComparaisonChart = () => {
+                    if (activeTab.value !== 'comparaison') return;
+                    
+                    nextTick(() => {
+                        const ctx = document.getElementById('comparaisonChart');
+                        if (!ctx) return;
+
+                        if (comparaisonChartInstance) {
+                            comparaisonChartInstance.destroy();
+                        }
+
+                        const type = compParam.value;
+                        const table = type === 'tSurface' ? 'surface' : 'air';
+
+                        // Fonction pour générer les datasets (une ligne par point)
+                        const getDatasetsForCampaign = (campagneConfig, prefix, colorPalette) => {
+                            if (!campagneConfig.date || !campagneConfig.etablissement) return [];
+
+                            const datasets = [];
+                            const etabData = etablissementsData.value.find(e => e.nom === campagneConfig.etablissement);
+                            if (!etabData) return [];
+
+                            const mesures = db.value[table].filter(m => 
+                                m.etablissement === campagneConfig.etablissement && 
+                                m.date === campagneConfig.date &&
+                                m[type] !== null && m[type] !== undefined && m[type] !== ''
+                            );
+
+                            etabData.points.forEach((p, index) => {
+                                if (compFiltrePoint.value !== 'Tous' && p.id !== compFiltrePoint.value) return;
+
+                                const mesuresPoint = mesures.filter(m => m.point === p.id);
+                                if (mesuresPoint.length === 0) return;
+
+                                const dataDict = {};
+                                mesuresPoint.forEach(m => {
+                                    dataDict[m.heure] = parseFloat(m[type]);
+                                });
+                                
+                                const color = colorPalette[index % colorPalette.length];
+
+                                datasets.push({
+                                    label: `[${prefix}] Pt ${p.id} - ${campagneConfig.etablissement}`,
+                                    dataDict: dataDict,
+                                    borderColor: color,
+                                    backgroundColor: color,
+                                    borderWidth: 2,
+                                    tension: 0.3,
+                                    spanGaps: true,
+                                    fill: false,
+                                    pointRadius: 4
+                                });
+                            });
+                            return datasets;
+                        };
+
+                        // Palettes distinctes : A (Rouge/Orange), B (Bleu/Cyan)
+                        const paletteA = ['#ef4444', '#f97316', '#f59e0b', '#dc2626', '#ea580c', '#b91c1c'];
+                        const paletteB = ['#3b82f6', '#0ea5e9', '#06b6d4', '#2563eb', '#0284c7', '#1d4ed8'];
+
+                        const rawDatasetsA = getDatasetsForCampaign(compA.value, 'A', paletteA);
+                        const rawDatasetsB = getDatasetsForCampaign(compB.value, 'B', paletteB);
+
+                        // Récupérer toutes les heures uniques existantes sur A et B
+                        const toutesLesHeures = new Set();
+                        [...rawDatasetsA, ...rawDatasetsB].forEach(ds => {
+                            Object.keys(ds.dataDict).forEach(h => toutesLesHeures.add(h));
+                        });
+                        const labels = Array.from(toutesLesHeures).sort((a, b) => a.localeCompare(b));
+
+                        // Aligner les données sur l'axe X (les heures)
+                        const finalDatasets = [...rawDatasetsA, ...rawDatasetsB].map(ds => {
+                            const dataArray = labels.map(h => ds.dataDict[h] !== undefined ? ds.dataDict[h] : null);
+                            return {
+                                label: ds.label,
+                                data: dataArray,
+                                borderColor: ds.borderColor,
+                                backgroundColor: ds.backgroundColor,
+                                borderWidth: ds.borderWidth,
+                                tension: ds.tension,
+                                spanGaps: ds.spanGaps,
+                                pointRadius: ds.pointRadius,
+                                fill: ds.fill
+                            };
+                        });
+
+                        comparaisonChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: finalDatasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { 
+                                        position: 'bottom', // Légende en bas pour faire de la place
+                                        labels: { boxWidth: 12, font: { size: 11 } }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ${getUnit(type)}`
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        title: { display: true, text: `${getLabel(type)} (${getUnit(type)})` }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                };
+
+
+
+
+
                 const updateLegend = () => {
                     const legendGradient = document.getElementById('legend-gradient');
                     const legendMin = document.getElementById('legend-min');
@@ -1581,7 +1828,7 @@
                     openGestionEtablissements, sauvegarderEtablissements,
                     ajouterEtablissement, supprimerEtablissement,
                     ajouterPoint, supprimerPoint,getSurfaceName, showMapPicker, tempLat, tempLng, ouvrirSelecteurCarte,
-                    validerCoordonnees, fermerSelecteurCarte,geolocaliser,
+                    validerCoordonnees, fermerSelecteurCarte, geolocaliser, compParam, compA, compB, updateComparaisonChart, datesDisponiblesA, datesDisponiblesB, onCompAChange, onCompBChange,compFiltrePoint, listePointsComparaison,
                     // Carte
                     carteType, carteHeure, animationActive, pointsAvecDonnees,
                     getColorForValue, updateCarte, initMap, toggleAnimation,
