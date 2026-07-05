@@ -9,42 +9,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suivi Thermique - Connecté</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-   
-    <!-- Dans le <head> -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+    
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-    <!-- Juste après le CSS, avant vos scripts -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     
     <style>
-        #map {
-            position: relative !important;
-            z-index: 1;
-        }
-        .leaflet-container {
-            position: relative !important;
-            z-index: 1;
-        }
-        .timeline-slider {
-            accent-color: #1e293b;
-        }
-        .point-marker {
-            transition: all 0.3s ease;
-        }
-        .point-marker:hover {
-            transform: scale(1.2);
-            z-index: 1000;
-        }
-        /* Le wrapper de la carte doit avoir overflow:hidden (déjà présent) */
-
-        .point-label {
-            pointer-events: none !important; /* les clics traversent vers le marqueur */
-        }
+        #map { position: relative !important; z-index: 1; }
+        .leaflet-container { position: relative !important; z-index: 1; }
+        .timeline-slider { accent-color: #1e293b; }
+        .point-marker { transition: all 0.3s ease; }
+        .point-marker:hover { transform: scale(1.2); z-index: 1000; }
+        .point-label { pointer-events: none !important; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans antialiased">
@@ -102,15 +86,12 @@
 
         </header>
 
-        <!-- Modal gestion établissements -->
         <div v-if="showGestion" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">            
-            <!-- Augmentation de max-w-lg à max-w-3xl -->
             <div class="w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
                 <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
                     <h2 class="text-sm font-bold">Gestion des établissements & points</h2>
                     <button @click="showGestion = false" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
                 </div>
-                <!-- Ajout de overflow-x-hidden pour éviter le débordement -->
                 <div class="overflow-y-auto overflow-x-hidden p-4 space-y-4 bg-gray-50">
                     <div v-for="(etab, index) in etablissementsData" :key="index" class="border rounded-lg p-3 bg-white shadow-sm">
                         <div class="flex justify-between items-center mb-2">
@@ -119,7 +100,6 @@
                         </div>
                         <div class="text-xs text-gray-600 mb-1">Points :</div>
                         
-                        <!-- Ajout de flex-wrap pour permettre le retour à la ligne -->
                         <div v-for="(point, pIndex) in etab.points" :key="pIndex" class="flex flex-col md:flex-row gap-2 items-start md:items-center mb-3 md:mb-1 ml-2 pb-2 md:pb-0 border-b border-gray-100 md:border-none">
                             
                             <div class="flex items-center gap-2 w-full md:w-auto">
@@ -156,7 +136,6 @@
             </div>
         </div>
 
-        <!-- Onglets -->
         <nav class="flex border-b border-gray-200 bg-gray-50">
             <button @click="switchTab('surface')" :class="activeTab === 'surface' ? 'border-b-4 border-orange-500 text-orange-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Surface</button>
             <button @click="switchTab('air')" :class="activeTab === 'air' ? 'border-b-4 border-blue-500 text-blue-600 font-bold bg-white' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-4 text-center transition-all">Air & WBGT</button>
@@ -169,8 +148,7 @@
                 <p class="font-bold text-sm">{{ successMessage }}</p>
             </div>
 
-            <!-- Contenu Surface / Air -->
-                <div v-if="activeTab === 'surface' || activeTab === 'air'" class="grid grid-cols-1 md:grid-cols-2 gap-6">                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+            <div v-if="activeTab === 'surface' || activeTab === 'air'" class="grid grid-cols-1 md:grid-cols-2 gap-6">                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
                     <div class="flex justify-between items-center mb-4 border-b pb-2">
                         <h2 class="text-lg font-bold" :class="activeTab === 'surface' ? 'text-orange-600' : 'text-blue-600'">
                             {{ editingId ? 'Modifier la mesure' : 'Nouvelle saisie' }}
@@ -263,7 +241,6 @@
                 </div>
             </div>
 
-            <!-- Onglet Carte -->
             <div v-if="activeTab === 'carte'" class="space-y-4"> <div class="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-bold text-gray-700">Type:</label>
@@ -292,7 +269,6 @@
                     </button>
                 </div>
 
-                <!-- Carte avec légende superposée -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm" style="position: relative; min-height: 500px; overflow: hidden;">                    
                     <div id="map" style="height: 500px; width: 100%; min-height: 500px;"></div>
 
@@ -306,7 +282,6 @@
                     </div>
                 </div>
 
-                <!-- Légende des points (existante) -->
                 <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4 justify-center">
                     <span v-for="point in pointsAvecDonnees" :key="point.id" class="flex items-center gap-1">
                         <span class="w-3 h-3 rounded-full inline-block" :style="{ backgroundColor: getColorForValue(point.valeur, carteType) }"></span>
@@ -322,11 +297,9 @@
                 </div>
             </div>
 
-
-
             <div v-if="activeTab === 'comparaison'" class="space-y-6">
                 <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <h2 class="text-lg font-bold text-purple-600 mb-4 border-b pb-2">Comparer des campagnes existantes</h2>
+                    <h2 class="text-lg font-bold text-purple-600 mb-4 border-b pb-2">Comparer des campagnes locales</h2>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -389,11 +362,75 @@
                         <canvas id="comparaisonChart"></canvas>
                     </div>
                 </div>
+
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mt-6">
+                    <h2 class="text-lg font-bold text-blue-600 mb-4 border-b pb-2">Comparaison Analogique Météo-France (CSV)</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-gray-50 p-4 rounded-lg border">
+                        <div>
+                            <label class="text-xs font-bold text-gray-700 block mb-1">1. Fichiers CSV :</label>
+                            <input type="file" multiple accept=".csv" @change="handleMeteoFileUpload" class="w-full p-1.5 text-sm border rounded bg-white">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-700 block mb-1">2. Fichier Référence :</label>
+                            <select v-model="meteoRefId" @change="updateMeteoApp" class="w-full p-1.5 border rounded bg-white text-sm" :disabled="meteoDatasets.length === 0">
+                                <option value="" disabled v-if="meteoDatasets.length === 0">Chargez des fichiers d'abord...</option>
+                                <option v-for="ds in meteoDatasets" :key="ds.id" :value="ds.id">{{ ds.legendName }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-700 block mb-1">3. Indicateur :</label>
+                            <select v-model="meteoVarSelect" @change="updateMeteoApp" class="w-full p-1.5 border rounded bg-white text-sm">
+                                <option value="T">Température de l'air (°C)</option>
+                                <option value="TD">Point de rosée (°C)</option>
+                                <option value="U">Humidité relative (%)</option>
+                                <option value="PSTAT">Pression atmosphérique (hPa)</option>
+                                <option value="FF">Force moyenne du vent (m/s)</option>
+                                <option value="DD">Direction du vent (°)</option>
+                                <option value="RR1">Pluie sur 1 heure (mm)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-700 block mb-1">4. Période (Heures relatives) :</label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm">De</span>
+                                <input type="number" v-model.number="meteoStartHour" @change="updateMeteoApp" class="w-20 p-1.5 border rounded text-sm bg-white" min="0">
+                                <span class="text-sm">à</span>
+                                <input type="number" v-model.number="meteoEndHour" @change="updateMeteoApp" class="w-20 p-1.5 border rounded text-sm bg-white" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="meteoChartDiv" style="width: 100%; height: 500px;" class="mb-4"></div>
+
+                    <div v-if="meteoDatasets.length > 1 && meteoRefId" class="mt-6 border-t pt-4">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">📊 Analyse de Similarité</h3>
+                        <div class="overflow-x-auto rounded-lg border">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-100 border-b">
+                                    <tr>
+                                        <th class="p-3 border-r font-bold text-gray-600">Période comparée</th>
+                                        <th class="p-3 border-r font-bold text-gray-600">Score global</th>
+                                        <th class="p-3 border-r font-bold text-gray-600">Score ({{ getMeteoVarLabel(meteoVarSelect) }})</th>
+                                        <th class="p-3 font-bold text-gray-600">Écart moyen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="res in meteoSimilarityResults" :key="res.name" class="border-b hover:bg-gray-50">
+                                        <td class="p-3 border-r">{{ res.name }}</td>
+                                        <td class="p-3 border-r font-bold" :class="getScoreClass(res.score)">{{ res.score !== null ? res.score + ' %' : 'N/A' }}</td>
+                                        <td class="p-3 border-r font-bold" :class="getScoreClass(res.specificScore)">{{ res.specificScore !== null ? res.specificScore + ' %' : 'N/A' }}</td>
+                                        <td class="p-3">{{ res.maeText }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
             
         </main>
 
-        <!-- Modale météo -->
         <div v-if="showMeteo" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">
             <div class="w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl">
                 <div class="flex justify-between items-center bg-slate-700 text-white p-3 rounded-t-xl">
@@ -412,7 +449,6 @@
                 </div>
             </div>
         </div>
-
 
         <div v-if="showMapPicker" class="fixed inset-0 bg-black bg-opacity-70 z-[99999] flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
@@ -443,7 +479,6 @@
 
     </div>
 
-    <!-- Script anti-cache -->
     <script>
         (async function checkVersion() {
             const STORAGE_KEY = 'app_version_local';
@@ -505,14 +540,14 @@
                 const showGestion = ref(false);
                 const showMeteo = ref(false);
 
-                // --- Variables Comparaison ---
+                // --- Variables Comparaison Locales ---
                 const compA = ref({ etablissement: 'Thierry Launay', date: dateCampagne.value });
                 const compB = ref({ etablissement: 'Jean Jacques Rousseau', date: dateCampagne.value });
                 const compParam = ref('tAir');
                 let comparaisonChartInstance = null;
 
                 let chartInstance = null;
-                let carteChartInstance = null; // Nouvelle instance pour le graphique de la carte
+                let carteChartInstance = null; 
                 let mapInstance = null;
                 let mapMarkers = [];
                 let animationInterval = null;
@@ -536,7 +571,6 @@
                     return val < 900 || val > 1100;
                 });
 
-                // --- Variables pour le sélecteur de carte ---
                 const showMapPicker = ref(false);
                 const editEtabIndex = ref(null);
                 const editPointIndex = ref(null);
@@ -545,7 +579,6 @@
                 let pickerMapInstance = null;
                 let pickerMarker = null;
 
-                // NOUVEAU : Variables pour le filtrage par point
                 const compFiltrePoint = ref('Tous');
                 const listePointsComparaison = computed(() => {
                     const points = new Set();
@@ -555,11 +588,9 @@
                     if (etabA) etabA.points.forEach(p => points.add(p.id));
                     if (etabB) etabB.points.forEach(p => points.add(p.id));
                     
-                    // Tri naturel pour avoir Point 1, Point 2, Point 10 dans le bon ordre
                     return Array.from(points).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
                 });
                 
-                // NOUVEAU : Calculer les dates qui contiennent réellement de la donnée
                 const datesDisponiblesA = computed(() => {
                     const dates = new Set();
                     [...db.value.surface, ...db.value.air].forEach(m => {
@@ -576,7 +607,6 @@
                     return Array.from(dates).sort((a,b) => b.localeCompare(a));
                 });
 
-                // NOUVEAU : Auto-sélection de la date la plus récente au changement d'établissement
                 const onCompAChange = () => {
                     compA.value.date = datesDisponiblesA.value.length > 0 ? datesDisponiblesA.value[0] : '';
                     updateComparaisonChart();
@@ -585,6 +615,246 @@
                     compB.value.date = datesDisponiblesB.value.length > 0 ? datesDisponiblesB.value[0] : '';
                     updateComparaisonChart();
                 };
+
+
+                // ==========================================
+                // === NOUVEAU : LOGIQUE COMPARATEUR MÉTÉO ===
+                // ==========================================
+                const meteoDatasets = ref([]);
+                const meteoRefId = ref('');
+                const meteoVarSelect = ref('T');
+                const meteoStartHour = ref(0);
+                const meteoEndHour = ref(24);
+                const meteoSimilarityResults = ref([]);
+
+                const meteoVarNames = {
+                    'T': 'Température (°C)', 'TD': 'Point de rosée (°C)', 'U': 'Humidité relative (%)',
+                    'PSTAT': 'Pression (hPa)', 'FF': 'Vent (m/s)', 'DD': 'Direction Vent (°)', 'RR1': 'Pluie (mm/h)'
+                };
+                
+                const meteoTolerances = { 'T': 15, 'TD': 15, 'U': 40, 'FF': 10, 'RR1': 5, 'PSTAT': 30, 'DD': 180 };
+                const meteoGlobalVars = ['T', 'TD', 'U', 'FF', 'RR1']; 
+
+                const getMeteoVarLabel = (v) => meteoVarNames[v] || v;
+
+                const getScoreClass = (score) => {
+                    if (score === null || score === undefined) return 'text-gray-400';
+                    if (score >= 80) return 'text-green-600';
+                    if (score >= 60) return 'text-orange-500';
+                    return 'text-red-600';
+                };
+
+                const handleMeteoFileUpload = (event) => {
+                    const files = Array.from(event.target.files);
+                    if (files.length === 0) return;
+
+                    meteoDatasets.value = [];
+                    let filesProcessed = 0;
+                    meteoRefId.value = '';
+
+                    files.forEach((file, index) => {
+                        Papa.parse(file, {
+                            header: true, skipEmptyLines: true, delimiter: ";",
+                            complete: function(results) {
+                                processMeteoData(file.name, results.data, index);
+                                filesProcessed++;
+                                if (filesProcessed === files.length) {
+                                    finalizeMeteoLoading();
+                                }
+                            }
+                        });
+                    });
+                };
+
+                const processMeteoData = (filename, data, order) => {
+                    let cleanData = {};
+                    let firstDate = null;
+                    let maxRelHour = 0;
+
+                    for (let row of data) {
+                        if (!row['DATE']) continue;
+                        let dateStr = String(row['DATE']);
+                        let currentDate = new Date(parseInt(dateStr.substring(0, 4)), parseInt(dateStr.substring(4, 6)) - 1, parseInt(dateStr.substring(6, 8)), parseInt(dateStr.substring(8, 10)));
+                        
+                        if (firstDate === null) firstDate = currentDate;
+                        let hoursDiff = Math.round((currentDate - firstDate) / (1000 * 60 * 60));
+                        if (hoursDiff > maxRelHour) maxRelHour = hoursDiff;
+
+                        let entry = { realDate: currentDate };
+                        ['T', 'TD', 'U', 'PSTAT', 'FF', 'DD', 'RR1'].forEach(v => {
+                            entry[v] = (row[v] !== undefined && row[v] !== '') ? parseFloat(row[v].replace(',', '.')) : null;
+                        });
+                        cleanData[hoursDiff] = entry;
+                    }
+
+                    if (Object.keys(cleanData).length > 0) {
+                        let legend = `${firstDate.toLocaleDateString('fr-FR')} (${filename.split('_')[0]})`;
+                        meteoDatasets.value.push({ id: filename, order: order, legendName: legend, data: cleanData, maxHour: maxRelHour });
+                    }
+                };
+
+                const finalizeMeteoLoading = () => {
+                    meteoDatasets.value.sort((a, b) => a.order - b.order);
+                    if (meteoDatasets.value.length > 0) {
+                        let globalMaxHour = Math.max(...meteoDatasets.value.map(d => d.maxHour));
+                        meteoEndHour.value = globalMaxHour;
+                        meteoRefId.value = meteoDatasets.value[0].id; // 1er fichier = ref par défaut
+                        updateMeteoApp();
+                    }
+                };
+
+                const updateMeteoApp = async () => {
+                    if (meteoDatasets.value.length === 0 || activeTab.value !== 'comparaison') return;
+                    await nextTick(); // S'assurer que la div Plotly est rendue
+                    drawMeteoChart();
+                    calculateMeteoSimilarity();
+                };
+
+                const drawMeteoChart = () => {
+                    const ctx = document.getElementById('meteoChartDiv');
+                    if (!ctx) return;
+
+                    const traces = [];
+                    const shapes = []; 
+                    let refDataset = meteoDatasets.value.find(d => d.id === meteoRefId.value);
+                    
+                    let topAxisVals = [];
+                    let topAxisText = [];
+                    
+                    if (refDataset) {
+                        let firstHourKey = Object.keys(refDataset.data)[0];
+                        let baseDate = new Date(refDataset.data[firstHourKey].realDate);
+                        let step = 1;
+                        let duration = meteoEndHour.value - meteoStartHour.value;
+                        if (duration > 72) step = 6;
+                        else if (duration > 48) step = 4;
+                        else if (duration > 24) step = 2;
+
+                        for (let h = meteoStartHour.value; h <= meteoEndHour.value; h += step) {
+                            let currentD = new Date(baseDate.getTime() + (h - firstHourKey) * 3600 * 1000);
+                            topAxisVals.push(h);
+                            let hh = currentD.getHours().toString().padStart(2, '0');
+                            let mm = currentD.getMinutes().toString().padStart(2, '0');
+                            topAxisText.push(`${hh}:${mm}`);
+                        }
+                    }
+
+                    meteoDatasets.value.forEach(dataset => {
+                        let xValues = Object.keys(dataset.data).map(Number).filter(x => x >= meteoStartHour.value && x <= meteoEndHour.value);
+                        let yValues = xValues.map(x => dataset.data[x][meteoVarSelect.value]);
+                        
+                        let hoverTexts = xValues.map(x => {
+                            let d = dataset.data[x].realDate;
+                            let hours = d.getHours().toString().padStart(2, '0');
+                            let minutes = d.getMinutes().toString().padStart(2, '0');
+                            return `${d.toLocaleDateString('fr-FR')} à ${hours}h${minutes}`;
+                        });
+
+                        let isRef = (dataset.id === meteoRefId.value);
+
+                        traces.push({
+                            x: xValues, y: yValues, name: dataset.legendName, type: 'scatter',
+                            mode: meteoVarSelect.value === 'DD' ? 'markers' : 'lines+markers',
+                            marker: { size: isRef ? 8 : 5 }, 
+                            line: { width: isRef ? 4 : 2, dash: isRef ? 'solid' : 'dot' },
+                            customdata: hoverTexts,
+                            hovertemplate: '<b>%{y}</b><br><i>%{customdata}</i><extra>%{name}</extra>'
+                        });
+
+                        if (isRef) {
+                            xValues.forEach(x => {
+                                if (dataset.data[x].realDate.getHours() === 0 && dataset.data[x].realDate.getMinutes() === 0) {
+                                    shapes.push({
+                                        type: 'line', x0: x, x1: x, y0: 0, y1: 1, yref: 'paper',
+                                        line: { color: 'rgba(0, 0, 0, 0.4)', width: 2, dash: 'dash' }
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    const layout = {
+                        xaxis: { title: 'Heures relatives', range: [meteoStartHour.value, meteoEndHour.value], gridcolor: '#e9ecef' },
+                        xaxis2: {
+                            title: 'Heure locale (Référence)', overlaying: 'x', side: 'top',
+                            range: [meteoStartHour.value, meteoEndHour.value], 
+                            tickmode: 'array', tickvals: topAxisVals, ticktext: topAxisText, showgrid: false
+                        },
+                        yaxis: { title: getMeteoVarLabel(meteoVarSelect.value), zeroline: false, gridcolor: '#e9ecef' },
+                        shapes: shapes,
+                        hovermode: 'x unified', 
+                        legend: { orientation: 'h', y: -0.2 },
+                        margin: { t: 50, l: 50, r: 20, b: 50 } 
+                    };
+
+                    Plotly.react('meteoChartDiv', traces, layout);
+                };
+
+                const calculateMeteoMAE = (refData, compData, variable, startH, endH) => {
+                    let sumError = 0; let count = 0;
+                    for (let hour = startH; hour <= endH; hour++) {
+                        if (refData[hour] && compData[hour] && refData[hour][variable] !== null && compData[hour][variable] !== null) {
+                            if (variable === 'DD') {
+                                let diff = Math.abs(refData[hour][variable] - compData[hour][variable]);
+                                sumError += diff > 180 ? 360 - diff : diff;
+                            } else {
+                                sumError += Math.abs(refData[hour][variable] - compData[hour][variable]);
+                            }
+                            count++;
+                        }
+                    }
+                    return count > 0 ? (sumError / count) : null;
+                };
+
+                const calculateMeteoGlobalScore = (refData, compData, startH, endH) => {
+                    let totalScore = 0; let validVarsCount = 0;
+                    meteoGlobalVars.forEach(v => {
+                        let mae = calculateMeteoMAE(refData, compData, v, startH, endH);
+                        if (mae !== null) {
+                            let score = 1 - (mae / meteoTolerances[v]);
+                            totalScore += Math.max(0, Math.min(1, score));
+                            validVarsCount++;
+                        }
+                    });
+                    return validVarsCount > 0 ? Math.round((totalScore / validVarsCount) * 100) : null;
+                };
+
+                const calculateMeteoSimilarity = () => {
+                    if (meteoDatasets.value.length < 2) return;
+                    let refDataset = meteoDatasets.value.find(d => d.id === meteoRefId.value);
+                    if (!refDataset) return;
+
+                    let results = [];
+                    meteoDatasets.value.forEach(dataset => {
+                        if (dataset.id === meteoRefId.value) return; 
+                        
+                        let globalScore = calculateMeteoGlobalScore(refDataset.data, dataset.data, meteoStartHour.value, meteoEndHour.value);
+                        let specificMAE = calculateMeteoMAE(refDataset.data, dataset.data, meteoVarSelect.value, meteoStartHour.value, meteoEndHour.value);
+                        
+                        let specificScore = null;
+                        if (specificMAE !== null) {
+                            let rawScore = 1 - (specificMAE / meteoTolerances[meteoVarSelect.value]);
+                            specificScore = Math.round(Math.max(0, Math.min(1, rawScore)) * 100);
+                        }
+                        
+                        let unitMatch = getMeteoVarLabel(meteoVarSelect.value).match(/\(([^)]+)\)/);
+                        let unit = unitMatch ? unitMatch[1] : '';
+                        let maeText = specificMAE !== null ? `± ${specificMAE.toFixed(1)} ${unit}` : 'Données insuffisantes';
+
+                        results.push({ 
+                            name: dataset.legendName, 
+                            score: globalScore, 
+                            specificScore: specificScore,
+                            maeText: maeText
+                        });
+                    });
+
+                    results.sort((a, b) => b.score - a.score);
+                    meteoSimilarityResults.value = results;
+                };
+                // ==========================================
+                // === FIN LOGIQUE MÉTÉO ====================
+                // ==========================================
 
 
                 const etablissementsDefaut = [
@@ -612,7 +882,6 @@
 
                 const etablissementsData = ref(JSON.parse(JSON.stringify(etablissementsDefaut)));
 
-                // Chargement des établissements
                 const loadEtablissementsCloud = async () => {
                     if (!isCloudActive.value) return;
                     const { data, error } = await supabaseClient.from('etablissements').select('data').eq('id', 1).maybeSingle();
@@ -667,7 +936,7 @@
                         localisation: '', 
                         lat: null, 
                         lng: null, 
-                        surfaceType: 'bitume' // Valeur par défaut
+                        surfaceType: 'bitume'
                     }); 
                 };                
                 const supprimerPoint = (indexEtab, indexPoint) => etablissementsData.value[indexEtab].points.splice(indexPoint, 1);
@@ -729,9 +998,7 @@
                     activeTab.value = tab;
                     if (tab === 'carte') {
                         await nextTick();
-                        // Nettoyer l'ancienne carte si elle existe
                         cleanupMap();
-                        // Recréer après un court délai pour que le DOM soit prêt
                         setTimeout(() => {
                             initMap();
                             updateCarte();
@@ -740,6 +1007,7 @@
                     } else if (tab === 'comparaison') {
                         await nextTick();
                         updateComparaisonChart();
+                        updateMeteoApp(); // Lancer Plotly s'il y a déjà des fichiers
                     } else {
                         const p = form.value.point;
                         form.value = { ...baseForm, point: p };
@@ -917,7 +1185,7 @@
                         
                         datasets.push({
                             label: `Point ${p.id} (${p.localisation || ''} - ${surfaceNom})`,
-                            data: data, // ⬅️ C'était cette ligne manquante !
+                            data: data,
                             borderColor: colors[index % colors.length],
                             backgroundColor: colors[index % colors.length],
                             tension: 0.1,
@@ -945,121 +1213,41 @@
                             }
                         }
                     });
-
-                    carteChartInstance = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: datasets
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
-                            },
-                            scales: {
-                                y: {
-                                    title: { 
-                                        display: true, 
-                                        text: `${getLabel(type)} (${getUnit(type)})` 
-                                    }
-                                }
-                            }
-                        }
-                    });
                 };
 
-                // --- Fonctions du sélecteur de carte ---
                 const ouvrirSelecteurCarte = async (eIndex, pIndex) => {
                     editEtabIndex.value = eIndex;
                     editPointIndex.value = pIndex;
                     
-                    // Récupère les coordonnées actuelles du point (s'il y en a)
                     const pt = etablissementsData.value[eIndex].points[pIndex];
                     tempLat.value = pt.lat || null;
                     tempLng.value = pt.lng || null;
                     
                     showMapPicker.value = true;
-
-                    // Attendre que la modale soit affichée dans le DOM
                     await nextTick(); 
 
-                    // Centre par défaut : Lille
                     let center = [50.6292, 3.0572]; 
                     if (tempLat.value && tempLng.value) {
                         center = [tempLat.value, tempLng.value];
                     } else if (mapInstance) {
-                        center = mapInstance.getCenter(); // Récupère le centre de votre carte d'analyse principale
+                        center = mapInstance.getCenter();
                     }
 
-                    // Nettoyage de sécurité si une ancienne carte existe
                     if (pickerMapInstance) {
                         pickerMapInstance.remove();
                         pickerMapInstance = null;
                     }
 
-                    // Initialisation de la carte Leaflet
-                    pickerMapInstance = L.map('picker-map', {
-                        center: center,
-                        zoom: 18
-                    });
-
-                    // Fond de carte Google Satellite (comme votre carte principale)
+                    pickerMapInstance = L.map('picker-map', { center: center, zoom: 18 });
                     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                        maxZoom: 20,
-                        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+                        maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
                     }).addTo(pickerMapInstance);
 
-                    // Si on a déjà des coordonnées, on place le marqueur
                     if (tempLat.value && tempLng.value) {
                         pickerMarker = L.marker([tempLat.value, tempLng.value]).addTo(pickerMapInstance);
                     }
 
-                    // Événement au clic sur la carte
                     pickerMapInstance.on('click', (e) => {
-                        tempLat.value = e.latlng.lat;
-                        tempLng.value = e.latlng.lng;
-                        
-                        if (pickerMarker) {
-                            pickerMarker.setLatLng(e.latlng); // Déplace le marqueur existant
-                        } else {
-                            pickerMarker = L.marker(e.latlng).addTo(pickerMapInstance); // Crée un nouveau marqueur
-                        }
-                    });
-
-                    // Fix pour forcer l'affichage correct des tuiles dans une modale
-                    setTimeout(() => pickerMapInstance.invalidateSize(), 200);
-                };
-
-                const validerCoordonnees = () => {
-                    if (editEtabIndex.value !== null && editPointIndex.value !== null) {
-                        // Enregistre les coordonnées avec 6 décimales (~10cm de précision)
-                        etablissementsData.value[editEtabIndex.value].points[editPointIndex.value].lat = Number(tempLat.value.toFixed(6));
-                        etablissementsData.value[editEtabIndex.value].points[editPointIndex.value].lng = Number(tempLng.value.toFixed(6));
-                    }
-                    fermerSelecteurCarte();
-                };
-
-                const fermerSelecteurCarte = () => {
-                    showMapPicker.value = false;
-                    if (pickerMapInstance) {
-                        pickerMapInstance.remove(); // Détruit l'instance proprement
-                        pickerMapInstance = null;
-                        pickerMarker = null;
-                    }
-                };
-
-
-
-                const geolocaliser = () => {
-                    if (!pickerMapInstance) return;
-
-                    // Demande à Leaflet de localiser l'utilisateur, de centrer la carte et de zoomer
-                    pickerMapInstance.locate({ setView: true, maxZoom: 19 });
-
-                    // Si la localisation réussit, on place automatiquement le marqueur
-                    pickerMapInstance.once('locationfound', (e) => {
                         tempLat.value = e.latlng.lat;
                         tempLng.value = e.latlng.lng;
                         
@@ -1070,24 +1258,44 @@
                         }
                     });
 
-                    // Si l'utilisateur refuse ou si le GPS est désactivé
+                    setTimeout(() => pickerMapInstance.invalidateSize(), 200);
+                };
+
+                const validerCoordonnees = () => {
+                    if (editEtabIndex.value !== null && editPointIndex.value !== null) {
+                        etablissementsData.value[editEtabIndex.value].points[editPointIndex.value].lat = Number(tempLat.value.toFixed(6));
+                        etablissementsData.value[editEtabIndex.value].points[editPointIndex.value].lng = Number(tempLng.value.toFixed(6));
+                    }
+                    fermerSelecteurCarte();
+                };
+
+                const fermerSelecteurCarte = () => {
+                    showMapPicker.value = false;
+                    if (pickerMapInstance) {
+                        pickerMapInstance.remove();
+                        pickerMapInstance = null;
+                        pickerMarker = null;
+                    }
+                };
+
+                const geolocaliser = () => {
+                    if (!pickerMapInstance) return;
+                    pickerMapInstance.locate({ setView: true, maxZoom: 19 });
+                    pickerMapInstance.once('locationfound', (e) => {
+                        tempLat.value = e.latlng.lat;
+                        tempLng.value = e.latlng.lng;
+                        
+                        if (pickerMarker) {
+                            pickerMarker.setLatLng(e.latlng);
+                        } else {
+                            pickerMarker = L.marker(e.latlng).addTo(pickerMapInstance);
+                        }
+                    });
                     pickerMapInstance.once('locationerror', (e) => {
                         alert("Impossible de vous localiser. Vérifiez que vous avez autorisé l'accès à la position dans votre navigateur.");
                     });
                 };
 
-
-
-
-
-
-
-
-
-
-
-                // --- Fonctions Carte ---
-                // --- Utilitaires Dynamiques pour la Carte ---
                 const getUnit = (type) => {
                     if (type === 'hr') return '%';
                     if (type === 'pression') return 'Pa';
@@ -1097,19 +1305,12 @@
                 const formatSurfaceName = (val) => {
                     if (!val) return 'Inconnu';
                     const mapping = {
-                        'bitume': 'Bitume',
-                        'pelouse': 'Pelouse',
-                        'dalles': 'Dalles',
-                        'pavedrainant': 'Pavé drainant',
-                        'terre': 'Terre',
-                        'terrebattue': 'Terre battue',
-                        'bois': 'Bois',
-                        'copeauxbois': 'Copeaux de bois',
-                        'herbe': 'Herbe'
+                        'bitume': 'Bitume', 'pelouse': 'Pelouse', 'dalles': 'Dalles',
+                        'pavedrainant': 'Pavé drainant', 'terre': 'Terre', 'terrebattue': 'Terre battue',
+                        'bois': 'Bois', 'copeauxbois': 'Copeaux de bois', 'herbe': 'Herbe'
                     };
                     return mapping[val] || val.charAt(0).toUpperCase() + val.slice(1);
                 };
-
 
                 const getSurfaceName = (pointId) => {
                     const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
@@ -1117,7 +1318,6 @@
                     const point = etab.points.find(p => p.id === pointId);
                     return point && point.surfaceType ? point.surfaceType : 'Inconnu';
                 };
-
 
                 const getLabel = (type) => {
                     const labels = {
@@ -1128,11 +1328,10 @@
                 };
 
                 const getColorBounds = (type) => {
-                    // On adapte les échelles min/max selon le paramètre
                     if (type === 'hr') return { min: 20, max: 100 }; 
                     if (type === 'pression') return { min: 980, max: 1030 };
-                    if (type === 'tSurface') return { min: 10, max: 60 }; // L'asphalte monte plus haut !
-                    return { min: 10, max: 45 }; // Plage par défaut pour T° Air, WBGT, etc.
+                    if (type === 'tSurface') return { min: 10, max: 60 };
+                    return { min: 10, max: 45 };
                 };
 
                 const getColorForValue = (value, type) => {
@@ -1141,22 +1340,16 @@
                     const bounds = getColorBounds(type);
                     const ratio = Math.max(0, Math.min(1, (value - bounds.min) / (bounds.max - bounds.min)));
                     
-                    // 1. Échelle "Surface" : Bleu -> Vert -> Rouge foncé
                     if (type === 'tSurface') {
                         let hue;
                         if (ratio < 0.5) {
-                            // Transition Bleu (240°) vers Vert (120°)
                             hue = 240 - (ratio * 2 * 120);
                         } else {
-                            // Transition Vert (120°) vers Rouge (0°)
                             hue = 120 - ((ratio - 0.5) * 2 * 120);
                         }
-                        
-                        // Luminosité : 40% pour garder un aspect "foncé" et intense
                         return `hsl(${hue}, 80%, 40%)`;
                     }
                     
-                    // 2. Échelle Air/WBGT : Classique (Bleu ciel vers Rouge vif)
                     const hue = (1 - ratio) * 240; 
                     return `hsl(${hue}, 100%, 50%)`;
                 };
@@ -1169,7 +1362,6 @@
                         m.date === date
                     );
                     if (mesures.length === 0) return null;
-                    // Trouver la mesure avec l'heure la plus proche de celle demandée
                     const heureStr = String(heure).padStart(2, '0') + ':00';
                     let closest = null;
                     let minDiff = Infinity;
@@ -1183,65 +1375,35 @@
                             closest = m;
                         }
                     }
-                    // Si diff > 2h, on ignore
                     if (minDiff > 2) return null;
                     const val = closest ? closest[type] : null;
                     return val !== undefined && val !== null ? val : null;
                 };
 
                 const updateCarte = () => {
-                    if (!mapInstance || activeTab.value !== 'carte') {
-                        return;
-                    }
+                    if (!mapInstance || activeTab.value !== 'carte') return;
                     
                     const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
-                    if (!etab) {
-                        console.warn('Établissement non trouvé:', etablissement.value);
-                        return;
-                    }
+                    if (!etab) return;
 
                     const pointsData = [];
                     for (const p of etab.points) {
-                        // Vérifiez que les coordonnées existent et sont valides
-                        if (!p.lat || !p.lng) {
-                            console.warn(`Point ${p.id} sans coordonnées`);
-                            continue;
-                        }
-                        
-                        // Vérifiez que les coordonnées sont dans une plage valide
-                        if (isNaN(p.lat) || isNaN(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
-                            console.warn(`Coordonnées invalides pour le point ${p.id}: lat=${p.lat}, lng=${p.lng}`);
-                            continue;
-                        }
+                        if (!p.lat || !p.lng || isNaN(p.lat) || isNaN(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) continue;
                         
                         const val = getDataForPoint(p.id, carteType.value, dateCampagne.value, carteHeure.value);
-                        pointsData.push({
-                            id: p.id,
-                            lat: p.lat,
-                            lng: p.lng,
-                            localisation: p.localisation || '',
-                            valeur: val
-                        });
+                        pointsData.push({ id: p.id, lat: p.lat, lng: p.lng, localisation: p.localisation || '', valeur: val });
                     }
                     
-                    console.log(`Points avec données: ${pointsData.length}`, pointsData);
                     pointsAvecDonnees.value = pointsData;
 
-                    // Supprimer les anciens marqueurs
-                    mapMarkers.forEach(marker => {
-                        if (mapInstance) mapInstance.removeLayer(marker);
-                    });
+                    mapMarkers.forEach(marker => { if (mapInstance) mapInstance.removeLayer(marker); });
                     mapMarkers = [];
 
-                    if (pointsData.length === 0) {
-                        console.warn('Aucun point valide à afficher sur la carte');
-                        return;
-                    }
+                    if (pointsData.length === 0) return;
 
                     for (const point of pointsData) {
-                        // On passe le type actuel à getColorForValue
                         const color = getColorForValue(point.valeur, carteType.value);
-                        const unit = getUnit(carteType.value); // On récupère l'unité
+                        const unit = getUnit(carteType.value);
                         
                         const popupContent = `
                             <div class="font-bold">Point ${point.id}</div>
@@ -1251,74 +1413,48 @@
                         `;
                         
                         const marker = L.circleMarker([point.lat, point.lng], {
-                            radius: 12,
-                            fillColor: color,
-                            color: '#ffffff',
-                            weight: 2,
-                            opacity: 1,
-                            fillOpacity: 0.85
+                            radius: 12, fillColor: color, color: '#ffffff', weight: 2, opacity: 1, fillOpacity: 0.85
                         }).bindPopup(popupContent);
 
-                        // Ajouter l'événement click pour ouvrir le popup
-                        marker.on('click', function() {
-                            this.openPopup();
-                        });
+                        marker.on('click', function() { this.openPopup(); });
 
-                        marker.bindTooltip(
-                            `Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A'}`,
-                            { permanent: false, direction: 'top' }
-                        );
-                                                                        
+                        marker.bindTooltip(`Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + '°C' : 'N/A'}`, { permanent: false, direction: 'top' });
+                                                                                                        
                         const label = L.marker([point.lat, point.lng], {
                             icon: L.divIcon({
                                 className: 'point-label',
                                 html: `<div class="text-xs font-bold text-white bg-black bg-opacity-60 px-1.5 py-0.5 rounded text-center" style="margin-top: -28px; font-size: 10px;">${point.id}</div>`,
-                                iconSize: [20, 20],
-                                iconAnchor: [10, 10]
+                                iconSize: [20, 20], iconAnchor: [10, 10]
                             })
                         });
                         
                         mapInstance.addLayer(label);
                         mapMarkers.push(label);
-                        
                         mapInstance.addLayer(marker);
                         mapMarkers.push(marker);
 
-                        marker.bindTooltip(
-                            `Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + ' ' + unit : 'N/A'}`,
-                            { permanent: false, direction: 'top' }
-                        );
+                        marker.bindTooltip(`Point ${point.id}: ${point.valeur != null ? point.valeur.toFixed(1) + ' ' + unit : 'N/A'}`, { permanent: false, direction: 'top' });
                     }
                     
-                    // Ajustez la vue pour montrer tous les points
                     if (pointsData.length > 0) {
                         const group = L.featureGroup(mapMarkers);
                         mapInstance.fitBounds(group.getBounds().pad(0.1));
                     }
                     updateLegend();
-
                 };
 
                 const initMap = () => {
-                    if (typeof L === 'undefined') {
-                        console.error('Leaflet library is not loaded!');
-                        return;
-                    }
+                    if (typeof L === 'undefined') return;
                     cleanupMap();
                     const container = document.getElementById('map');
-                    if (!container) {
-                        console.warn('Container map non trouvé');
-                        return;
-                    }
+                    if (!container) return;
+                    
                     container.style.display = 'block';
                     container.style.height = '500px';
                     container.style.width = '100%';
 
                     const etab = etablissementsData.value.find(e => e.nom === etablissement.value);
-                    const defaultCenter = [50.6178, 3.0754];
-                    const defaultZoom = 18;
-
-                    let center = defaultCenter;
+                    let center = [50.6178, 3.0754];
                     if (etab && etab.points.length > 0) {
                         const validPoints = etab.points.filter(p => p.lat && p.lng);
                         if (validPoints.length > 0) {
@@ -1329,21 +1465,13 @@
                     }
 
                     try {
-                        mapInstance = L.map('map', {
-                            center: center,
-                            zoom: defaultZoom,
-                            zoomControl: false
-                        });
-
+                        mapInstance = L.map('map', { center: center, zoom: 18, zoomControl: false });
                         L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                            maxZoom: 20,
-                            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                            attribution: 'Google Satellite'
+                            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satellite'
                         }).addTo(mapInstance);
 
                         L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
 
-                        // Une seule invalidation après la création
                         setTimeout(() => {
                             if (mapInstance) {
                                 mapInstance.invalidateSize();
@@ -1351,60 +1479,36 @@
                             }
                         }, 300);
 
-                    } catch (error) {
-                        console.error('Erreur initialisation carte:', error);
-                    }
+                    } catch (error) { console.error('Erreur initialisation carte:', error); }
                 };
 
                 const toggleAnimation = () => {
                     animationActive.value = !animationActive.value;
-                    if (animationActive.value) {
-                        startAnimation();
-                    } else {
-                        stopAnimation();
-                    }
+                    if (animationActive.value) { startAnimation(); } else { stopAnimation(); }
                 };
-
 
                 const forceReloadData = async () => {
                     if (isCloudActive.value) {
                         await loadEtablissementsCloud();
                         await loadCloudData();
                         if (activeTab.value === 'carte') {
-                            setTimeout(() => {
-                                initMap();
-                                updateCarte();
-                            }, 200);
+                            setTimeout(() => { initMap(); updateCarte(); }, 200);
                         }
                     }
                 };
 
-
-
-                
-                // Fonction pour nettoyer proprement la carte
                 const cleanupMap = () => {
                     if (mapInstance) {
-                        // Supprimer tous les marqueurs
-                        mapMarkers.forEach(marker => {
-                            if (mapInstance) mapInstance.removeLayer(marker);
-                        });
+                        mapMarkers.forEach(marker => { if (mapInstance) mapInstance.removeLayer(marker); });
                         mapMarkers = [];
-                        
-                        // Supprimer la carte
                         mapInstance.remove();
                         mapInstance = null;
                     }
                 };
 
-                // Appeler cette fonction quand on change d'établissement ou qu'on quitte la page
-                onUnmounted(() => {
-                    stopAnimation();
-                    cleanupMap();
-                });
+                onUnmounted(() => { stopAnimation(); cleanupMap(); });
 
                 const forceRefreshMap = () => {
-                    console.log('Force refresh de la carte');
                     const container = document.getElementById('map');
                     if (!container) return;
                     
@@ -1413,17 +1517,13 @@
                     container.style.width = '100%';
                     
                     if (mapInstance) {
-                        // Forcer un resize et un re-rendu
                         mapInstance.invalidateSize();
                         setTimeout(() => {
                             mapInstance.invalidateSize();
                             updateCarte();
-                            // Ajuster la vue sur les points
                             if (pointsAvecDonnees.value.length > 0) {
                                 const markers = [];
-                                pointsAvecDonnees.value.forEach(p => {
-                                    markers.push(L.marker([p.lat, p.lng]));
-                                });
+                                pointsAvecDonnees.value.forEach(p => { markers.push(L.marker([p.lat, p.lng])); });
                                 if (markers.length > 0) {
                                     const group = L.featureGroup(markers);
                                     mapInstance.fitBounds(group.getBounds().pad(0.1));
@@ -1442,14 +1542,11 @@
                         const ctx = document.getElementById('comparaisonChart');
                         if (!ctx) return;
 
-                        if (comparaisonChartInstance) {
-                            comparaisonChartInstance.destroy();
-                        }
+                        if (comparaisonChartInstance) comparaisonChartInstance.destroy();
 
                         const type = compParam.value;
                         const table = type === 'tSurface' ? 'surface' : 'air';
 
-                        // Fonction pour générer les datasets (une ligne par point)
                         const getDatasetsForCampaign = (campagneConfig, prefix, colorPalette) => {
                             if (!campagneConfig.date || !campagneConfig.etablissement) return [];
 
@@ -1470,134 +1567,88 @@
                                 if (mesuresPoint.length === 0) return;
 
                                 const dataDict = {};
-                                mesuresPoint.forEach(m => {
-                                    dataDict[m.heure] = parseFloat(m[type]);
-                                });
+                                mesuresPoint.forEach(m => { dataDict[m.heure] = parseFloat(m[type]); });
                                 
                                 const color = colorPalette[index % colorPalette.length];
 
                                 datasets.push({
                                     label: `[${prefix}] Pt ${p.id} - ${campagneConfig.etablissement}`,
                                     dataDict: dataDict,
-                                    borderColor: color,
-                                    backgroundColor: color,
-                                    borderWidth: 2,
-                                    tension: 0.3,
-                                    spanGaps: true,
-                                    fill: false,
-                                    pointRadius: 4
+                                    borderColor: color, backgroundColor: color, borderWidth: 2, tension: 0.3, spanGaps: true, fill: false, pointRadius: 4
                                 });
                             });
                             return datasets;
                         };
 
-                        // Palettes distinctes : A (Rouge/Orange), B (Bleu/Cyan)
                         const paletteA = ['#ef4444', '#f97316', '#f59e0b', '#dc2626', '#ea580c', '#b91c1c'];
                         const paletteB = ['#3b82f6', '#0ea5e9', '#06b6d4', '#2563eb', '#0284c7', '#1d4ed8'];
 
                         const rawDatasetsA = getDatasetsForCampaign(compA.value, 'A', paletteA);
                         const rawDatasetsB = getDatasetsForCampaign(compB.value, 'B', paletteB);
 
-                        // Récupérer toutes les heures uniques existantes sur A et B
                         const toutesLesHeures = new Set();
                         [...rawDatasetsA, ...rawDatasetsB].forEach(ds => {
                             Object.keys(ds.dataDict).forEach(h => toutesLesHeures.add(h));
                         });
                         const labels = Array.from(toutesLesHeures).sort((a, b) => a.localeCompare(b));
 
-                        // Aligner les données sur l'axe X (les heures)
                         const finalDatasets = [...rawDatasetsA, ...rawDatasetsB].map(ds => {
                             const dataArray = labels.map(h => ds.dataDict[h] !== undefined ? ds.dataDict[h] : null);
                             return {
-                                label: ds.label,
-                                data: dataArray,
-                                borderColor: ds.borderColor,
-                                backgroundColor: ds.backgroundColor,
-                                borderWidth: ds.borderWidth,
-                                tension: ds.tension,
-                                spanGaps: ds.spanGaps,
-                                pointRadius: ds.pointRadius,
-                                fill: ds.fill
+                                label: ds.label, data: dataArray, borderColor: ds.borderColor, backgroundColor: ds.backgroundColor,
+                                borderWidth: ds.borderWidth, tension: ds.tension, spanGaps: ds.spanGaps, pointRadius: ds.pointRadius, fill: ds.fill
                             };
                         });
 
                         comparaisonChartInstance = new Chart(ctx, {
                             type: 'line',
-                            data: {
-                                labels: labels,
-                                datasets: finalDatasets
-                            },
+                            data: { labels: labels, datasets: finalDatasets },
                             options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
+                                responsive: true, maintainAspectRatio: false,
                                 plugins: {
-                                    legend: { 
-                                        position: 'bottom', // Légende en bas pour faire de la place
-                                        labels: { boxWidth: 12, font: { size: 11 } }
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ${getUnit(type)}`
-                                        }
-                                    }
+                                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                                    tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ${getUnit(type)}` } }
                                 },
-                                scales: {
-                                    y: {
-                                        title: { display: true, text: `${getLabel(type)} (${getUnit(type)})` }
-                                    }
-                                }
+                                scales: { y: { title: { display: true, text: `${getLabel(type)} (${getUnit(type)})` } } }
                             }
                         });
                     });
                 };
 
-
-
-
-
                 const updateLegend = () => {
                     const legendGradient = document.getElementById('legend-gradient');
                     const legendMin = document.getElementById('legend-min');
                     const legendMax = document.getElementById('legend-max');
-                    const legendTitle = document.getElementById('legend-title'); // Nouveau
+                    const legendTitle = document.getElementById('legend-title');
 
                     if (!legendGradient) return;
 
-                    // Récupérer toutes les mesures pour la date, l'établissement et le type sélectionné
                     const type = carteType.value;
                     const table = type === 'tSurface' ? 'surface' : 'air';
                     
                     const allMesures = db.value[table].filter(m => 
                         m.etablissement === etablissement.value && 
-                        m.date === dateCampagne.value &&
-                        m[type] !== null && m[type] !== undefined
+                        m.date === dateCampagne.value && m[type] !== null && m[type] !== undefined
                     );
-                    if (legendTitle) {
-                        legendTitle.textContent = `${getLabel(type)} (${getUnit(type)})`;
-                    }
+                    if (legendTitle) legendTitle.textContent = `${getLabel(type)} (${getUnit(type)})`;
                     const temps = allMesures.map(m => m[type]);
 
                     if (temps.length === 0) {
                         legendGradient.style.background = 'linear-gradient(to right, #cccccc, #cccccc)';
-                        legendMin.textContent = 'N/A';
-                        legendMax.textContent = 'N/A';
+                        legendMin.textContent = 'N/A'; legendMax.textContent = 'N/A';
                         return;
                     }
 
-                    const min = Math.min(...temps);
-                    const max = Math.max(...temps);
-                    const displayMin = Math.floor(min);
-                    const displayMax = Math.ceil(max);
+                    const min = Math.min(...temps); const max = Math.max(...temps);
+                    const displayMin = Math.floor(min); const displayMax = Math.ceil(max);
 
-                    legendMin.textContent = displayMin;
-                    legendMax.textContent = displayMax;
+                    legendMin.textContent = displayMin; legendMax.textContent = displayMax;
 
                     const steps = 10;
                     let gradient = 'linear-gradient(to right';
                     for (let i = 0; i <= steps; i++) {
                         const ratio = i / steps;
                         const value = displayMin + ratio * (displayMax - displayMin);
-                        // On passe bien le 'type' à la fonction de couleur
                         const color = getColorForValue(value, type);
                         const percent = (ratio * 100).toFixed(0);
                         gradient += `, ${color} ${percent}%`;
@@ -1606,53 +1657,27 @@
                     legendGradient.style.background = gradient;
                 };
 
-
-
-
                 watch(etablissement, () => {
                     if (activeTab.value === 'carte') {
-                        // Réinitialiser la carte quand l'établissement change
                         if (mapInstance) {
-                            // On détruit et recrée pour éviter les problèmes de cache
                             mapInstance.remove();
                             mapInstance = null;
                             mapMarkers = [];
                         }
-                        setTimeout(() => {
-                            initMap();
-                            updateCarte();
-                            updateCarteChart();
-                        }, 200);
+                        setTimeout(() => { initMap(); updateCarte(); updateCarteChart(); }, 200);
                     }
                 });
 
-                // Watcher pour la date avec refresh
                 watch(dateCampagne, () => { 
                     if (activeTab.value === 'carte') {
                         setTimeout(() => {
-                            if (mapInstance) {
-                                mapInstance.invalidateSize();
-                                updateCarte();
-                                updateCarteChart();
-                            }
+                            if (mapInstance) { mapInstance.invalidateSize(); updateCarte(); updateCarteChart(); }
                         }, 100);
                     }
                 });
 
-                // Watcher pour le type de température
-                watch(carteType, () => { 
-                    if (activeTab.value === 'carte') {
-                        updateCarte(); 
-                        updateCarteChart();
-                    }
-                });
-
-                // Watcher pour l'heure
-                watch(carteHeure, () => { 
-                    if (activeTab.value === 'carte') {
-                        updateCarte(); 
-                    }
-                });
+                watch(carteType, () => { if (activeTab.value === 'carte') { updateCarte(); updateCarteChart(); } });
+                watch(carteHeure, () => { if (activeTab.value === 'carte') { updateCarte(); } });
 
                 const startAnimation = () => {
                     if (animationInterval) clearInterval(animationInterval);
@@ -1661,28 +1686,16 @@
                         if (h > 23) h = 0;
                         carteHeure.value = h;
                         updateCarte();
-                    }, 1500); // Change d'heure toutes les 1.5 secondes
+                    }, 1500); 
                 };
 
                 const stopAnimation = () => {
-                    if (animationInterval) {
-                        clearInterval(animationInterval);
-                        animationInterval = null;
-                    }
+                    if (animationInterval) { clearInterval(animationInterval); animationInterval = null; }
                 };
 
-                // Watch pour mettre à jour la carte quand l'heure change
-                watch(carteHeure, () => { if (activeTab.value === 'carte') updateCarte(); });
-                watch(carteType, () => { if (activeTab.value === 'carte') updateCarte(); });
-                watch(dateCampagne, () => { if (activeTab.value === 'carte') updateCarte(); });
-
-                // Nettoyage
                 onUnmounted(() => {
                     stopAnimation();
-                    if (mapInstance) {
-                        mapInstance.remove();
-                        mapInstance = null;
-                    }
+                    if (mapInstance) { mapInstance.remove(); mapInstance = null; }
                 });
 
                 onMounted(() => {
@@ -1694,21 +1707,14 @@
                     window.addEventListener('online', () => { isOnline.value = true; loadCloudData(); });
                     window.addEventListener('offline', () => { isOnline.value = false; });
                     window.addEventListener('resize', () => {
-                        if (activeTab.value === 'carte' && mapInstance) {
-                            setTimeout(() => {
-                                mapInstance.invalidateSize();
-                            }, 200);
-                        }
+                        if (activeTab.value === 'carte' && mapInstance) { setTimeout(() => { mapInstance.invalidateSize(); }, 200); }
                     });
 
                     if (isOnline.value) { loadCloudData(); loadEtablissementsCloud(); }
                 });
 
                 const fileInput = ref(null);
-
-                const triggerFileInput = () => {
-                    fileInput.value.click();
-                };
+                const triggerFileInput = () => { fileInput.value.click(); };
 
                 const importExcel = async (event) => {
                     const file = event.target.files[0];
@@ -1720,28 +1726,19 @@
                         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                         const rows = XLSX.utils.sheet_to_json(firstSheet);
 
-                        if (rows.length === 0) {
-                            alert("Le fichier Excel est vide.");
-                            return;
-                        }
+                        if (rows.length === 0) { alert("Le fichier Excel est vide."); return; }
 
-                        // Détecter le type de données : surface ou air
                         const isSurface = rows.some(row => row.hasOwnProperty('T° Surface (°C)'));
                         const isAir = rows.some(row => row.hasOwnProperty('T° Air (°C)') || row.hasOwnProperty('WBGT (°C)'));
 
-                        if (!isSurface && !isAir) {
-                            alert("Format de fichier non reconnu. Assurez-vous d'exporter depuis l'application.");
-                            return;
-                        }
+                        if (!isSurface && !isAir) { alert("Format de fichier non reconnu. Assurez-vous d'exporter depuis l'application."); return; }
 
                         const table = isSurface ? 'surface' : 'air';
-                        let count = 0;
-                        let skipped = 0;
+                        let count = 0; let skipped = 0;
 
                         for (const row of rows) {
-                            // Construction de l'objet mesure en fonction des colonnes présentes
                             const mesure = {
-                                id: Date.now().toString() + '_' + count, // génère un ID unique
+                                id: Date.now().toString() + '_' + count, 
                                 date: row.Date || '',
                                 heure: row.Heure || '',
                                 etablissement: row['Établissement'] || '',
@@ -1768,31 +1765,17 @@
                                 mesure.numEnregAir = row['N° Enregistrement'] ? parseInt(row['N° Enregistrement']) : null;
                             }
 
-                            // Vérifier les champs obligatoires
-                            if (!mesure.date || !mesure.etablissement || !mesure.point) {
-                                skipped++;
-                                continue;
-                            }
+                            if (!mesure.date || !mesure.etablissement || !mesure.point) { skipped++; continue; }
 
-                            // Vérifier que l'établissement existe dans la liste ; sinon, on l'ignore ou on l'ajoute ?
                             const etabExists = etablissementsData.value.some(e => e.nom === mesure.etablissement);
-                            if (!etabExists) {
-                                skipped++;
-                                continue;
-                            }
+                            if (!etabExists) { skipped++; continue; }
 
-                            // Vérifier que le point existe pour cet établissement
                             const etab = etablissementsData.value.find(e => e.nom === mesure.etablissement);
                             const pointExists = etab.points.some(p => String(p.id) === mesure.point);
-                            if (!pointExists) {
-                                skipped++;
-                                continue;
-                            }
+                            if (!pointExists) { skipped++; continue; }
 
-                            // Ajouter dans la base locale
                             db.value[table].push(mesure);
 
-                            // Si cloud actif, on insère aussi dans Supabase
                             if (isCloudActive.value) {
                                 const supabaseTable = isSurface ? 'campagne_surface' : 'campagne_air';
                                 const { error } = await supabaseClient.from(supabaseTable).insert([mesure]);
@@ -1807,15 +1790,13 @@
                         alert(`Import terminé : ${count} mesure(s) ajoutée(s), ${skipped} ligne(s) ignorée(s).`);
                         updateChart();
                         updateCarte();
-                        event.target.value = ''; // réinitialiser l'input
+                        event.target.value = ''; 
 
                     } catch (error) {
                         console.error("Erreur lors de l'import:", error);
                         alert("Erreur lors de l'import du fichier Excel.");
                     }
                 };
-
-
 
                 return { 
                     activeTab, form, showSuccess, successMessage, etablissement, pointsDisponibles, dateCampagne, appVersion,
@@ -1832,8 +1813,10 @@
                     // Carte
                     carteType, carteHeure, animationActive, pointsAvecDonnees,
                     getColorForValue, updateCarte, initMap, toggleAnimation,
-                    forceRefreshMap, getUnit, fileInput, triggerFileInput, importExcel// <-- Ajouter cette ligne
-                    
+                    forceRefreshMap, getUnit, fileInput, triggerFileInput, importExcel,
+                    // Comparateur Météo
+                    meteoDatasets, meteoRefId, meteoVarSelect, meteoStartHour, meteoEndHour,
+                    meteoSimilarityResults, getMeteoVarLabel, getScoreClass, handleMeteoFileUpload, updateMeteoApp
                 };
             }
         }).mount('#app');
