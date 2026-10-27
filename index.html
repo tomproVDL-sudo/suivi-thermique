@@ -1451,7 +1451,7 @@
                     updateLegend();
                 };
 
-                const initMap = () => {
+const initMap = () => {
                     if (typeof L === 'undefined') return;
                     cleanupMap();
                     const container = document.getElementById('map');
@@ -1478,7 +1478,7 @@
                             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satellite'
                         });
 
-                        // 2. Initialisation de la carte avec Google Sat par défaut
+                        // 2. Initialisation de la carte avec Google Sat
                         mapInstance = L.map('map', { 
                             center: center, 
                             zoom: 18, 
@@ -1486,56 +1486,36 @@
                             layers: [googleSat] 
                         });
 
-                        // 3. Préparation des couches de plans (A REMPLACER AVEC TES VRAIES DONNÉES)
+                        // 3. Préparation des menus de couches
                         let baseMaps = {
                             "🛰️ Google Satellite": googleSat
                         };
+                        let overlayMaps = {}; // Ajout des cases à cocher
 
-                        // Définir les plans en fonction de l'établissement sélectionné
                         // Définir les plans en fonction de l'établissement sélectionné
                         if (etablissement.value === 'Thierry Launay') {
-                            // Coordonnées converties en Lat/Lng (WGS 84) : [[Sud, Ouest], [Nord, Est]]
                             const boundsTL_Avant = [[50.61734, 3.07404], [50.61828, 3.07600]]; 
-                            const planTL_Avant = L.imageOverlay('./plans/TLav.png', boundsTL_Avant);
+                            const planTL_Avant = L.imageOverlay('plans/TLav.png', boundsTL_Avant);
                             
                             const boundsTL_Apres = [[50.61734, 3.07404], [50.61828, 3.07600]];
-                            const planTL_Apres = L.imageOverlay('./plans/TLap.png', boundsTL_Apres);
-                        
-                            baseMaps["🗺️ Plan Avant"] = planTL_Avant;
-                            baseMaps["🏗️ Plan Après"] = planTL_Apres;
+                            const planTL_Apres = L.imageOverlay('plans/TLap.png', boundsTL_Apres);
+
+                            overlayMaps["🗺️ Plan Avant"] = planTL_Avant;
+                            overlayMaps["🏗️ Plan Après"] = planTL_Apres;
                         } 
                         else if (etablissement.value === 'Jean Jacques Rousseau') {
-                            // Coordonnées converties en Lat/Lng (WGS 84) : [[Sud, Ouest], [Nord, Est]]
                             const boundsJJR_Avant = [[50.64223, 3.05355], [50.64289, 3.05492]];
-                            const planJJR_Avant = L.imageOverlay('./plans/JJRav.png', boundsJJR_Avant);
+                            const planJJR_Avant = L.imageOverlay('plans/JJRav.png', boundsJJR_Avant);
                             
                             const boundsJJR_Apres = [[50.64223, 3.05355], [50.64289, 3.05492]];
-                            const planJJR_Apres = L.imageOverlay('./plans/JJRap.png', boundsJJR_Apres);
-                        
-                            baseMaps["🗺️ Plan Avant"] = planJJR_Avant;
-                            baseMaps["🏗️ Plan Après"] = planJJR_Apres;
+                            const planJJR_Apres = L.imageOverlay('plans/JJRap.png', boundsJJR_Apres);
+
+                            overlayMaps["🗺️ Plan Avant"] = planJJR_Avant;
+                            overlayMaps["🏗️ Plan Après"] = planJJR_Apres;
                         }
 
-                        // 4. Ajout du menu de sélection des couches en haut à droite
-                        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(mapInstance);
-                        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-
-                        setTimeout(() => {
-                            if (mapInstance) {
-                                mapInstance.invalidateSize();
-                                updateCarte();
-                            }
-                        }, 300);
-
-                    } catch (error) { console.error('Erreur initialisation carte:', error); }
-                };
-
-                    try {
-                        mapInstance = L.map('map', { center: center, zoom: 18, zoomControl: false });
-                        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satellite'
-                        }).addTo(mapInstance);
-
+                        // 4. Ajout du menu (on force l'affichage déroulé avec collapsed: false)
+                        L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: false }).addTo(mapInstance);
                         L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
 
                         setTimeout(() => {
