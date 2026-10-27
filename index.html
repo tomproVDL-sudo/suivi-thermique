@@ -1473,6 +1473,63 @@
                     }
 
                     try {
+                        // 1. Couche de base Google Satellite
+                        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                            maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satellite'
+                        });
+
+                        // 2. Initialisation de la carte avec Google Sat par défaut
+                        mapInstance = L.map('map', { 
+                            center: center, 
+                            zoom: 18, 
+                            zoomControl: false,
+                            layers: [googleSat] 
+                        });
+
+                        // 3. Préparation des couches de plans (A REMPLACER AVEC TES VRAIES DONNÉES)
+                        let baseMaps = {
+                            "🛰️ Google Satellite": googleSat
+                        };
+
+                        // Définir les plans en fonction de l'établissement sélectionné
+                        if (etablissement.value === 'Thierry Launay') {
+                            // Remplace les coordonnées par celles notées dans QGIS : [[Sud, Ouest], [Nord, Est]]
+                            const boundsTL_Avant = [[50.6270, 3.0500], [50.6290, 3.0530]]; 
+                            const planTL_Avant = L.imageOverlay('./plans/TLav.png', boundsTL_Avant);
+                            
+                            const boundsTL_Apres = [[50.6270, 3.0500], [50.6290, 3.0530]];
+                            const planTL_Apres = L.imageOverlay('./plans/TLap.png', boundsTL_Apres);
+
+                            baseMaps["🗺️ Plan Avant"] = planTL_Avant;
+                            baseMaps["🏗️ Plan Après"] = planTL_Apres;
+                        } 
+                        else if (etablissement.value === 'Jean Jacques Rousseau') {
+                            // Remplace les coordonnées par celles notées dans QGIS : [[Sud, Ouest], [Nord, Est]]
+                            const boundsJJR_Avant = [[50.6300, 3.0600], [50.6320, 3.0630]];
+                            const planJJR_Avant = L.imageOverlay('./plans/JJRav.png', boundsJJR_Avant);
+                            
+                            const boundsJJR_Apres = [[50.6300, 3.0600], [50.6320, 3.0630]];
+                            const planJJR_Apres = L.imageOverlay('./plans/JJRap.png', boundsJJR_Apres);
+
+                            baseMaps["🗺️ Plan Avant"] = planJJR_Avant;
+                            baseMaps["🏗️ Plan Après"] = planJJR_Apres;
+                        }
+
+                        // 4. Ajout du menu de sélection des couches en haut à droite
+                        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(mapInstance);
+                        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+
+                        setTimeout(() => {
+                            if (mapInstance) {
+                                mapInstance.invalidateSize();
+                                updateCarte();
+                            }
+                        }, 300);
+
+                    } catch (error) { console.error('Erreur initialisation carte:', error); }
+                };
+
+                    try {
                         mapInstance = L.map('map', { center: center, zoom: 18, zoomControl: false });
                         L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
                             maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satellite'
