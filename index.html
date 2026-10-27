@@ -1492,25 +1492,26 @@
                         };
 
                         // Définir les plans en fonction de l'établissement sélectionné
+                        // Définir les plans en fonction de l'établissement sélectionné
                         if (etablissement.value === 'Thierry Launay') {
-                            // Remplace les coordonnées par celles notées dans QGIS : [[Sud, Ouest], [Nord, Est]]
-                            const boundsTL_Avant = [[50.6270, 3.0500], [50.6290, 3.0530]]; 
+                            // Coordonnées converties en Lat/Lng (WGS 84) : [[Sud, Ouest], [Nord, Est]]
+                            const boundsTL_Avant = [[50.61734, 3.07404], [50.61828, 3.07600]]; 
                             const planTL_Avant = L.imageOverlay('./plans/TLav.png', boundsTL_Avant);
                             
-                            const boundsTL_Apres = [[50.6270, 3.0500], [50.6290, 3.0530]];
+                            const boundsTL_Apres = [[50.61734, 3.07404], [50.61828, 3.07600]];
                             const planTL_Apres = L.imageOverlay('./plans/TLap.png', boundsTL_Apres);
-
+                        
                             baseMaps["🗺️ Plan Avant"] = planTL_Avant;
                             baseMaps["🏗️ Plan Après"] = planTL_Apres;
                         } 
                         else if (etablissement.value === 'Jean Jacques Rousseau') {
-                            // Remplace les coordonnées par celles notées dans QGIS : [[Sud, Ouest], [Nord, Est]]
-                            const boundsJJR_Avant = [[50.6300, 3.0600], [50.6320, 3.0630]];
+                            // Coordonnées converties en Lat/Lng (WGS 84) : [[Sud, Ouest], [Nord, Est]]
+                            const boundsJJR_Avant = [[50.64223, 3.05355], [50.64289, 3.05492]];
                             const planJJR_Avant = L.imageOverlay('./plans/JJRav.png', boundsJJR_Avant);
                             
-                            const boundsJJR_Apres = [[50.6300, 3.0600], [50.6320, 3.0630]];
+                            const boundsJJR_Apres = [[50.64223, 3.05355], [50.64289, 3.05492]];
                             const planJJR_Apres = L.imageOverlay('./plans/JJRap.png', boundsJJR_Apres);
-
+                        
                             baseMaps["🗺️ Plan Avant"] = planJJR_Avant;
                             baseMaps["🏗️ Plan Après"] = planJJR_Apres;
                         }
