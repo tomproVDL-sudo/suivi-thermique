@@ -410,19 +410,26 @@
      * hMin / hMax : première et dernière heure de mesure (« HH:MM »), pour la plage de la campagne.
      * Seuils chaleur : moyennes sur 3 jours des Tn et Tx (repère indicatif canicule Nord : 18 / 33 °C).
      */
-    function resumerCampagne(rows, dateIso, hMin, hMax) {
+    function resumerCampagne(rows, dateIso, hMin, hMax, options) {
         if (!rows || !rows.length) return null;
+        const opt = Object.assign({ joursAvant: 3, plage: 'auto', hDebut: 10, hFin: 16 }, options || {});
+        const nAvant = Math.max(0, Math.min(3, parseInt(opt.joursAvant, 10) || 0));
         const heure = (ts) => new Date(ts).getHours();
         const parJour = (iso) => rows.filter((r) => jourLocal(r.ts) === iso);
         const jour = parJour(dateIso);
-        const h0 = hMin ? parseInt(hMin, 10) : 9;
-        const h1 = hMax ? Math.min(23, parseInt(hMax, 10) + (hMax.slice(3) !== '00' ? 1 : 0)) : 17;
+        let h0, h1;
+        if (opt.plage === 'fixe') {
+            h0 = parseInt(opt.hDebut, 10); h1 = parseInt(opt.hFin, 10);
+        } else {
+            h0 = hMin ? parseInt(hMin, 10) : 9;
+            h1 = hMax ? Math.min(23, parseInt(hMax, 10) + (hMax.slice(3) !== '00' ? 1 : 0)) : 17;
+        }
         const plage = jour.filter((r) => heure(r.ts) >= h0 && heure(r.ts) <= h1);
         const debutJour = new Date(dateIso + 'T00:00:00').getTime();
-        const avant72 = rows.filter((r) => r.ts < debutJour && r.ts >= debutJour - 72 * 3600 * 1000);
+        const avant72 = nAvant ? rows.filter((r) => r.ts < debutJour && r.ts >= debutJour - nAvant * 24 * 3600 * 1000) : [];
         const txJour = (iso) => { const j = parJour(iso); return maxi(j.map((r) => (r.tx !== null ? r.tx : r.t))); };
         const tnJour = (iso) => { const j = parJour(iso); return mini(j.map((r) => (r.tn !== null ? r.tn : r.t))); };
-        const jPrec = [-3, -2, -1].map((n) => decalerJour(dateIso, n));
+        const jPrec = Array.from({ length: nAvant }, (_, i) => decalerJour(dateIso, i - nAvant));
         const j3 = [-2, -1, 0].map((n) => decalerJour(dateIso, n));
         const tn3 = moyenne(j3.map(tnJour));
         const tx3 = moyenne(j3.map(txJour));
@@ -438,9 +445,10 @@
             ventPlage: moyenne(plage.map((x) => x.ff)),
             rafaleJ: maxi(jour.map((x) => x.rafale)),
             pluieJ: somme(jour.map((x) => x.rr)),
-            pluie72: somme(avant72.map((x) => x.rr)),
-            tx3avant: moyenne(jPrec.map(txJour)),
-            tn3avant: moyenne(jPrec.map(tnJour)),
+            pluie72: nAvant ? somme(avant72.map((x) => x.rr)) : null,
+            tx3avant: nAvant ? moyenne(jPrec.map(txJour)) : null,
+            tn3avant: nAvant ? moyenne(jPrec.map(tnJour)) : null,
+            joursAvant: nAvant,
             tn3, tx3
         };
         r.radiative = r.solarPlage !== null ? (r.solarPlage >= 400 && (r.nebPlage === null || r.nebPlage <= 4) && (r.ventPlage === null || r.ventPlage <= 20)) : null;
@@ -456,19 +464,20 @@
         { cle: 'solarPlage', nom: 'Rayonnement pendant les mesures', unite: 'W/m²', tol: 150 },
         { cle: 'nebPlage', nom: 'Nébulosité pendant les mesures', unite: 'octas', tol: 3 },
         { cle: 'ventPlage', nom: 'Vent pendant les mesures', unite: 'km/h', tol: 8 },
-        { cle: 'pluie72', nom: 'Pluie des 72 h précédentes', unite: 'mm', tol: 5 },
-        { cle: 'tx3avant', nom: 'T max moyenne des 3 jours précédents', unite: '°C', tol: 4 }
+        { cle: 'pluie72', nom: 'Pluie des jours précédents', unite: 'mm', tol: 5 },
+        { cle: 'tx3avant', nom: 'T max moyenne des jours précédents', unite: '°C', tol: 4 }
     ];
 
-    function scoreComparabilite(a, b) {
+    function scoreComparabilite(a, b, criteresActifs) {
         if (!a || !b) return null;
         const details = [];
         for (const c of CRITERES_COMPARABILITE) {
+            if (criteresActifs && !criteresActifs.includes(c.cle)) continue;
             if (a[c.cle] === null || a[c.cle] === undefined || b[c.cle] === null || b[c.cle] === undefined) continue;
             const ecart = Math.abs(a[c.cle] - b[c.cle]);
             details.push({ ...c, ecart, score: Math.max(0, 1 - ecart / c.tol) });
         }
-        if (details.length < 3) return null;
+        if (details.length < (criteresActifs ? 1 : 3)) return null;
         return { score: Math.round(100 * details.reduce((s, d) => s + d.score, 0) / details.length), details };
     }
 
@@ -510,6 +519,37 @@
         }
         if (r.status === 404) throw new Error('Relais WeatherLink introuvable (404) : fonction non déployée ou mauvaise adresse.');
         return lireJson(r, 'WeatherLink');
+    }
+
+    /** Historique WeatherLink (/v2/historic) : fusion des capteurs par horodatage. Unités : °F, mph, inHg. */
+    function lireWeatherLinkHistorique(json) {
+        const parTs = {};
+        for (const capteur of (json && json.sensors) || []) {
+            for (const d of capteur.data || []) {
+                if (!estNombre(d.ts)) continue;
+                const o = parTs[d.ts] || (parTs[d.ts] = { ts: Number(d.ts) * 1000 });
+                const v = (...noms) => premier(...noms.map((n) => d[n]));
+                const t = v('temp_last', 'temp_out', 'temp', 'temp_avg');
+                if (t !== null && o.t === undefined) o.t = fVersC(t);
+                const hr = v('hum_last', 'hum_out', 'hum');
+                if (hr !== null && o.hr === undefined) o.hr = hr;
+                const sol = v('solar_rad_avg', 'solar_rad');
+                if (sol !== null) o.solar = sol;
+                const ff = v('wind_speed_avg', 'wind_speed');
+                if (ff !== null) o.ff = mphVersKmh(ff);
+                const raf = v('wind_speed_hi', 'wind_gust');
+                if (raf !== null) o.rafale = mphVersKmh(raf);
+                const rr = v('rainfall_mm');
+                if (rr !== null) o.rr = rr; else { const rin = v('rainfall_in'); if (rin !== null) o.rr = pouceVersMm(rin); }
+            }
+        }
+        return Object.values(parTs).map((o) => Object.assign({ t: null, hr: null, solar: null, ff: null, rafale: null, rr: null }, o)).sort((a, b) => a.ts - b.ts);
+    }
+
+    async function weatherLinkHistorique(stationId, debutSec, finSec, reglages, jeton, cleAnon, relaisParDefaut) {
+        const json = await appelWeatherLink('historic/' + stationId, reglages, jeton, cleAnon, relaisParDefaut,
+            { 'start-timestamp': String(Math.floor(debutSec)), 'end-timestamp': String(Math.floor(finSec)) });
+        return lireWeatherLinkHistorique(json);
     }
 
     async function weatherLinkStations(reglages, jeton, cleAnon, relaisParDefaut) {
@@ -555,7 +595,7 @@
         lireReglages, ecrireReglages, effacerCles, REGLAGES_DEFAUT,
         lireWeatherLinkActuel, lireWeatherLinkStations, lireMeteoFranceObs, lirePrevisions,
         previsions, meteoFranceObs, weatherLinkStations, weatherLinkActuel, testerWeatherLink, testerMeteoFrance,
-        lireCsvDPClim, dpclimHoraire, fenetreCampagne, resumerCampagne, scoreComparabilite, CRITERES_COMPARABILITE,
+        lireCsvDPClim, dpclimHoraire, lireWeatherLinkHistorique, weatherLinkHistorique, fenetreCampagne, resumerCampagne, scoreComparabilite, CRITERES_COMPARABILITE,
         temperatureA, messageErreurMeteoFrance, apercuCle, jourLocal, decalerJour,
         directionTexte, temps,
         conv: { fVersC, mphVersKmh, msVersKmh, inHgVersHpa, kelvinOuCelsius, paOuHpa }

@@ -3,10 +3,10 @@
 //   copie en cache pour fonctionner hors ligne dans la cour.
 // - Bibliothèques externes (versions figées) : cache d'abord.
 // - API (Supabase, météo) et fonds de carte : jamais mis en cache ici.
-const VERSION = '2.1.2';
+const VERSION = '2.2.0';
 const CACHE = 'suivi-thermique-' + VERSION;
 
-const FICHIERS_APP = ['./', './index.html', './meteo.js?v=2.1.2', './manifest.json', './iconTherm.png'];
+const FICHIERS_APP = ['./', './index.html', './meteo.js?v=2.2.0', './manifest.json', './iconTherm.png'];
 const BIBLIOTHEQUES = [
     'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js',
