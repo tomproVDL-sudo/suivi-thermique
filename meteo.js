@@ -20,6 +20,7 @@
         wlApiKey: '',
         wlApiSecret: '',
         mfApiKey: '',
+        mfApiKeyObs: '',                // facultatif : clé distincte pour « Données d'observation »
         mfStation: '59343001',          // Lille-Lesquin (à confirmer via « Tester »)
         mfStationNom: 'Lille-Lesquin',
         relaisUrl: '',                  // vide = <SUPABASE_URL>/functions/v1/weatherlink-relais
@@ -43,7 +44,7 @@
 
     function effacerCles() {
         const r = lireReglages();
-        r.wlApiKey = ''; r.wlApiSecret = ''; r.mfApiKey = '';
+        r.wlApiKey = ''; r.wlApiSecret = ''; r.mfApiKey = ''; r.mfApiKeyObs = '';
         ecrireReglages(r);
         return r;
     }
@@ -265,29 +266,30 @@
 
     async function meteoFranceObs(station, cle) {
         if (!cle) throw new Error('Clé Météo-France manquante (Paramètres météo).');
-        const base = MF_BASE + 'DPObs/v1/station/';
         const entetes = { apikey: cle, accept: 'application/json' };
-        try {
-            const r = await fetch(`${base}infrahoraire-6m?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
-            const res = lireMeteoFranceObs(await lireJson(r, 'Météo-France'));
-            if (res && res.t !== null) return res;
-        } catch (e) {
-            if (e.status === 401 || e.status === 403 || e.status === 429) throw new Error(messageErreurMeteoFrance(e, 'Observation Météo-France'));
+        let derniere = null;
+        // Version 2 de l'API (abonnements récents), puis version 1 ; 6 minutes puis horaire
+        for (const version of ['v2', 'v1']) {
+            for (const pas of ['infrahoraire-6m', 'horaire']) {
+                try {
+                    const r = await fetch(`${MF_BASE}DPObs/${version}/station/${pas}?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
+                    const res = lireMeteoFranceObs(await lireJson(r, 'Météo-France'));
+                    if (res && res.t !== null) return res;
+                } catch (e) {
+                    derniere = e;
+                    if (e.status === 429) throw new Error(messageErreurMeteoFrance(e, 'Observation Météo-France'));
+                    if (e.status === 401) break; // clé refusée pour cette version : essayer l'autre version
+                }
+            }
         }
-        // Repli sur l'observation horaire
-        try {
-            const r2 = await fetch(`${base}horaire?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
-            return lireMeteoFranceObs(await lireJson(r2, 'Météo-France (horaire)'));
-        } catch (e) {
-            throw new Error(messageErreurMeteoFrance(e, 'Observation Météo-France'));
-        }
+        throw new Error(derniere ? messageErreurMeteoFrance(derniere, 'Observation Météo-France') : 'Observation Météo-France : aucune donnée pour cette station.');
     }
 
     /** Teste séparément les deux API Météo-France utilisées par l'application. */
-    async function testerMeteoFrance(cle, station) {
+    async function testerMeteoFrance(cle, station, cleObs) {
         const res = { obs: null, clim: null };
         try {
-            const o = await meteoFranceObs(station, cle);
+            const o = await meteoFranceObs(station, cleObs || cle);
             res.obs = { ok: !!(o && o.t !== null), message: o && o.t !== null ? `${o.t.toFixed(1).replace('.', ',')} °C à ${o.date ? o.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '?'}` : 'réponse sans température' };
         } catch (e) {
             res.obs = { ok: false, message: e.message };

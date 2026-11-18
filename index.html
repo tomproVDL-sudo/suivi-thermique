@@ -22,7 +22,7 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
-    <script src="meteo.js"></script>
+    <script src="meteo.js?v=2.1.2"></script>
 
     <style>
         #map { position: relative !important; z-index: 1; }
@@ -721,8 +721,10 @@
                     <div class="bg-white border rounded-lg p-3 space-y-2">
                         <h3 class="font-bold text-slate-800">Station de référence – Météo-France</h3>
                         <p class="text-xs text-gray-500">Portail portail-api.meteofrance.fr : ton application doit être abonnée à <b>« Données d'observation »</b> (bandeau) et <b>« Données climatologiques »</b> (comparaison des campagnes). Génère une <b>API Key</b> avec une longue durée de validité : un « token » ne dure qu'1 heure.</p>
-                        <label class="block text-xs font-bold text-gray-700">Clé API Météo-France (API Key)</label>
+                        <label class="block text-xs font-bold text-gray-700">Clé API « Données climatologiques » (API Key)</label>
                         <input v-model.trim="parametresSaisie.mfApiKey" :type="voirCles ? 'text' : 'password'" autocomplete="off" class="w-full p-2.5 border rounded-lg font-mono text-xs">
+                        <label class="block text-xs font-bold text-gray-700">Clé API « Données d'observation » <span class="font-normal text-gray-500">(seulement si différente)</span></label>
+                        <input v-model.trim="parametresSaisie.mfApiKeyObs" :type="voirCles ? 'text' : 'password'" autocomplete="off" placeholder="vide = même clé" class="w-full p-2.5 border rounded-lg font-mono text-xs">
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700">N° de station (8 chiffres)</label>
@@ -788,7 +790,7 @@
         leurs données s'il changeait. La version affichée est APP_VERSION ci-dessous.
     -->
     <script>
-        const APP_VERSION = '2.1.0';
+        const APP_VERSION = '2.1.2';
         const { createApp, ref, computed, onMounted, nextTick, watch, onUnmounted } = Vue;
 
         const SUPABASE_URL = 'https://nxtlihyemnrzbxhezryf.supabase.co';
@@ -829,7 +831,7 @@
             return n === null ? null : Math.round(n);
         };
 
-        createApp({
+        const app = createApp({
             setup() {
                 const isOnline = ref(navigator.onLine);
                 const session = ref(null);
@@ -2166,7 +2168,7 @@ const initMap = () => {
                         Meteo.previsions(lieu.lat, lieu.lon, 12),
                         st && st.type === 'WL'
                             ? Meteo.weatherLinkActuel(st.id, r, jeton, SUPABASE_KEY, relaisParDefaut)
-                            : Meteo.meteoFranceObs(r.mfStation, r.mfApiKey)
+                            : Meteo.meteoFranceObs(r.mfStation, r.mfApiKeyObs || r.mfApiKey)
                     ]);
                     previsionsMeteo.value = prev.status === 'fulfilled' ? prev.value : [];
                     if (actu.status === 'fulfilled' && actu.value) {
@@ -2221,7 +2223,7 @@ const initMap = () => {
                 const ouvrirParametresMeteo = () => {
                     menuOpen.value = false;
                     const r = reglagesMeteo.value;
-                    parametresSaisie.value = { wlApiKey: r.wlApiKey, wlApiSecret: r.wlApiSecret, mfApiKey: r.mfApiKey, mfStation: r.mfStation, mfStationNom: r.mfStationNom, relaisUrl: r.relaisUrl };
+                    parametresSaisie.value = { wlApiKey: r.wlApiKey, wlApiSecret: r.wlApiSecret, mfApiKey: r.mfApiKey, mfApiKeyObs: r.mfApiKeyObs || '', mfStation: r.mfStation, mfStationNom: r.mfStationNom, relaisUrl: r.relaisUrl };
                     testWL.value = { ok: false, message: '' };
                     testMF.value = { ok: false, message: '' };
                     voirCles.value = false;
@@ -2253,14 +2255,14 @@ const initMap = () => {
                     const p = parametresSaisie.value;
                     if (!p.mfApiKey) { testMF.value = { message: '❌ Saisis d\'abord la clé API.' }; return; }
                     testMF.value = { message: 'Test en cours…' };
-                    const res = await Meteo.testerMeteoFrance(p.mfApiKey, p.mfStation);
+                    const res = await Meteo.testerMeteoFrance(p.mfApiKey, p.mfStation, p.mfApiKeyObs);
                     testMF.value = { message: '', obs: res.obs, clim: res.clim };
                 };
-                const apercuCle = (c) => Meteo.apercuCle(c);
+                const apercuCle = (c) => (Meteo.apercuCle ? Meteo.apercuCle(c) : '');
                 const effacerClesAppareil = () => {
                     if (!confirm('Effacer les clés WeatherLink et Météo-France de cet appareil ?')) return;
                     reglagesMeteo.value = Meteo.effacerCles();
-                    parametresSaisie.value = { ...parametresSaisie.value, wlApiKey: '', wlApiSecret: '', mfApiKey: '' };
+                    parametresSaisie.value = { ...parametresSaisie.value, wlApiKey: '', wlApiSecret: '', mfApiKey: '', mfApiKeyObs: '' };
                     meteoActuelle.value = null;
                 };
 
@@ -2683,7 +2685,15 @@ const initMap = () => {
                     fmt, directionTexte, tempsIcone, tempsTexte, apercuCle
                 };
             }
-        }).mount('#app');
+        });
+        app.config.errorHandler = (err, vm, info) => {
+            console.error('Erreur application', info, err);
+            const div = document.createElement('div');
+            div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;background:#b91c1c;color:#fff;padding:10px;font:13px sans-serif';
+            div.textContent = '⚠️ Erreur : ' + (err && err.message) + ' — recharge la page (Ctrl+Maj+R). Si ça persiste, envoie ce message.';
+            document.body.appendChild(div);
+        };
+        app.mount('#app');
     </script>
 
     <script>
