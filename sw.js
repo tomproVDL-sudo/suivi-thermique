@@ -3,7 +3,7 @@
 //   copie en cache pour fonctionner hors ligne dans la cour.
 // - Bibliothèques externes (versions figées) : cache d'abord.
 // - API (Supabase, météo) et fonds de carte : jamais mis en cache ici.
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const CACHE = 'suivi-thermique-' + VERSION;
 
 const FICHIERS_APP = ['./', './index.html', './meteo.js', './manifest.json', './iconTherm.png'];

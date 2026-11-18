@@ -225,10 +225,35 @@
             const detail = (json && (json.message || json.error || json.description)) || texte.slice(0, 160);
             const err = new Error(`${contexte} : erreur ${reponse.status}${detail ? ' – ' + detail : ''}`);
             err.status = reponse.status;
+            err.code = json && json.code ? String(json.code) : '';
+            err.detail = detail;
             throw err;
         }
         return json;
     }
+
+    /**
+     * Traduit une erreur du portail Météo-France (passerelle WSO2) en message utile.
+     * 900901 = jeton invalide ou expiré ; 900908 / 403 = application non abonnée à cette API ;
+     * 900800 / 429 = quota dépassé.
+     */
+    function messageErreurMeteoFrance(err, nomApi) {
+        const code = String(err.code || '');
+        const s = err.status;
+        if (code === '900901' || s === 401) {
+            return `${nomApi} : clé invalide ou expirée (code 900901). Un « token » généré sur le portail ne dure qu'1 heure : génère plutôt une « API Key » en lui donnant une longue durée de validité.`;
+        }
+        if (code === '900908' || code === '900910' || s === 403) {
+            return `${nomApi} : ton application n'est pas abonnée à cette API sur le portail Météo-France (code ${code || s}).`;
+        }
+        if (code === '900800' || code === '900802' || s === 429) {
+            return `${nomApi} : quota de requêtes dépassé, réessaie dans une minute.`;
+        }
+        if (s === 404) return `${nomApi} : station ou ressource introuvable (404). Vérifie le n° de station.`;
+        return `${nomApi} : ${err.message}`;
+    }
+
+    const MF_BASE = 'https://public-api.meteofrance.fr/public/';
 
     async function previsions(lat, lon, heures) {
         const variables = 'temperature_2m,relative_humidity_2m,cloud_cover,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,shortwave_radiation,weather_code';
@@ -240,18 +265,227 @@
 
     async function meteoFranceObs(station, cle) {
         if (!cle) throw new Error('Clé Météo-France manquante (Paramètres météo).');
-        const base = 'https://public-api.meteofrance.fr/public/DPObs/v1/station/';
+        const base = MF_BASE + 'DPObs/v1/station/';
         const entetes = { apikey: cle, accept: 'application/json' };
         try {
             const r = await fetch(`${base}infrahoraire-6m?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
             const res = lireMeteoFranceObs(await lireJson(r, 'Météo-France'));
             if (res && res.t !== null) return res;
         } catch (e) {
-            if (e.status === 401 || e.status === 403) throw new Error('Clé Météo-France refusée (vérifie la clé et l\'abonnement à l\'API « Données d\'observation »).');
+            if (e.status === 401 || e.status === 403 || e.status === 429) throw new Error(messageErreurMeteoFrance(e, 'Observation Météo-France'));
         }
         // Repli sur l'observation horaire
-        const r2 = await fetch(`${base}horaire?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
-        return lireMeteoFranceObs(await lireJson(r2, 'Météo-France (horaire)'));
+        try {
+            const r2 = await fetch(`${base}horaire?id_station=${encodeURIComponent(station)}&format=json`, { headers: entetes });
+            return lireMeteoFranceObs(await lireJson(r2, 'Météo-France (horaire)'));
+        } catch (e) {
+            throw new Error(messageErreurMeteoFrance(e, 'Observation Météo-France'));
+        }
+    }
+
+    /** Teste séparément les deux API Météo-France utilisées par l'application. */
+    async function testerMeteoFrance(cle, station) {
+        const res = { obs: null, clim: null };
+        try {
+            const o = await meteoFranceObs(station, cle);
+            res.obs = { ok: !!(o && o.t !== null), message: o && o.t !== null ? `${o.t.toFixed(1).replace('.', ',')} °C à ${o.date ? o.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '?'}` : 'réponse sans température' };
+        } catch (e) {
+            res.obs = { ok: false, message: e.message };
+        }
+        try {
+            const r = await fetch(`${MF_BASE}DPClim/v1/information-station?id-station=${encodeURIComponent(station)}`, { headers: { apikey: cle, accept: 'application/json' } });
+            const info = await lireJson(r, 'Climatologie');
+            const nom = Array.isArray(info) && info[0] ? (info[0].nom || info[0].nomUsuel || '') : '';
+            res.clim = { ok: true, message: nom ? `accès OK (${nom})` : 'accès OK' };
+        } catch (e) {
+            res.clim = { ok: false, message: messageErreurMeteoFrance(e, 'Climatologie Météo-France') };
+        }
+        return res;
+    }
+
+    // ---------- Données climatologiques horaires (DPClim) ----------
+
+    /** Lit le CSV horaire DPClim (séparateur « ; », décimales « , », DATE = AAAAMMJJHH en UTC). */
+    function lireCsvDPClim(texte) {
+        const lignes = String(texte || '').replace(/\r/g, '').split('\n').filter((l) => l.trim());
+        if (lignes.length < 2) return [];
+        const sep = lignes[0].includes(';') ? ';' : ',';
+        const nettoyer = (v) => String(v === undefined ? '' : v).trim().replace(/^"|"$/g, '');
+        const entetes = lignes[0].split(sep).map((h) => nettoyer(h).toUpperCase());
+        const idx = (...noms) => { for (const n of noms) { const i = entetes.indexOf(n); if (i !== -1) return i; } return -1; };
+        const iDate = idx('DATE', 'AAAAMMJJHH');
+        if (iDate === -1) return [];
+        const col = {
+            t: idx('T'), tn: idx('TN'), tx: idx('TX'), td: idx('TD'), u: idx('U'),
+            rr: idx('RR1'), ff: idx('FF'), dd: idx('DD'), fxi: idx('FXI3S', 'FXI', 'FXY'),
+            glo: idx('GLO'), n: idx('N', 'NEB'), pmer: idx('PMER'), ins: idx('INS')
+        };
+        const nombre = (cells, i) => {
+            if (i === -1) return null;
+            const v = nettoyer(cells[i]).replace(',', '.');
+            if (v === '' || v.toLowerCase() === 'mq') return null;
+            const n = Number(v);
+            return isFinite(n) ? n : null;
+        };
+        const rows = [];
+        for (const ligne of lignes.slice(1)) {
+            const c = ligne.split(sep);
+            const d = nettoyer(c[iDate]).replace(/\D/g, '');
+            if (d.length < 10) continue;
+            const ts = Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8), +d.slice(8, 10));
+            const celsius = (v) => (v === null ? null : (v > 100 ? v - 273.15 : v));
+            const glo = nombre(c, col.glo);
+            const n = nombre(c, col.n);
+            const ff = nombre(c, col.ff);
+            const fxi = nombre(c, col.fxi);
+            rows.push({
+                ts,
+                t: celsius(nombre(c, col.t)), tn: celsius(nombre(c, col.tn)), tx: celsius(nombre(c, col.tx)), td: celsius(nombre(c, col.td)),
+                u: nombre(c, col.u), rr: nombre(c, col.rr),
+                ff: ff === null ? null : ff * 3.6, rafale: fxi === null ? null : fxi * 3.6, dd: nombre(c, col.dd),
+                // GLO : énergie horaire en J/cm² -> irradiance moyenne en W/m²
+                solar: glo === null ? null : glo * 10000 / 3600,
+                n: n !== null && n >= 0 && n <= 8 ? n : null,
+                pmer: nombre(c, col.pmer), ins: nombre(c, col.ins)
+            });
+        }
+        rows.sort((a, b) => a.ts - b.ts);
+        return rows;
+    }
+
+    const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+    const isoSansMs = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    /** Commande DPClim horaire pour une station, puis récupération du fichier (asynchrone côté Météo-France). */
+    async function dpclimHoraire(station, debut, fin, cle, surProgression) {
+        if (!cle) throw new Error('Clé Météo-France manquante (Paramètres météo).');
+        const entetes = { apikey: cle, accept: 'application/json' };
+        const url = `${MF_BASE}DPClim/v1/commande-station/horaire?id-station=${encodeURIComponent(station)}` +
+            `&date-deb-periode=${encodeURIComponent(isoSansMs(debut))}&date-fin-periode=${encodeURIComponent(isoSansMs(fin))}`;
+        let idCommande;
+        try {
+            const r = await fetch(url, { headers: entetes });
+            const json = await lireJson(r, 'Commande climatologique');
+            idCommande = json && json.elaboreProduitAvecDemandeResponse && json.elaboreProduitAvecDemandeResponse.return;
+        } catch (e) {
+            throw new Error(messageErreurMeteoFrance(e, 'Climatologie Météo-France'));
+        }
+        if (!idCommande) throw new Error('Météo-France n\'a pas renvoyé de numéro de commande.');
+        for (let essai = 0; essai < 25; essai++) {
+            if (surProgression) surProgression(essai);
+            const r = await fetch(`${MF_BASE}DPClim/v1/commande/fichier?id-cmde=${encodeURIComponent(idCommande)}`, { headers: entetes });
+            if ((r.status === 200 || r.status === 201)) {
+                const texte = await r.text();
+                if (texte.trim()) return lireCsvDPClim(texte);
+            } else if (r.status !== 204 && r.status !== 202) {
+                const err = new Error(`Fichier climatologique : erreur ${r.status}`);
+                err.status = r.status;
+                throw new Error(messageErreurMeteoFrance(err, 'Climatologie Météo-France'));
+            }
+            await attendre(2000);
+        }
+        throw new Error('Commande Météo-France toujours en préparation : réessaie dans quelques minutes.');
+    }
+
+    // ---------- Résumé météo d'une campagne et comparabilité ----------
+
+    const moyenne = (vals) => { const v = vals.filter((x) => x !== null && x !== undefined && isFinite(x)); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+    const somme = (vals) => { const v = vals.filter((x) => x !== null && x !== undefined && isFinite(x)); return v.length ? v.reduce((s, x) => s + x, 0) : null; };
+    const maxi = (vals) => { const v = vals.filter((x) => x !== null && x !== undefined && isFinite(x)); return v.length ? Math.max(...v) : null; };
+    const mini = (vals) => { const v = vals.filter((x) => x !== null && x !== undefined && isFinite(x)); return v.length ? Math.min(...v) : null; };
+
+    // Date locale (Europe/Paris sur l'appareil) au format AAAA-MM-JJ
+    const jourLocal = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const decalerJour = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return jourLocal(d.getTime()); };
+
+    /** Fenêtre à commander pour une campagne : J-3 00:00 -> J 23:00, heure locale. */
+    function fenetreCampagne(dateIso) {
+        return { debut: new Date(decalerJour(dateIso, -3) + 'T00:00:00'), fin: new Date(dateIso + 'T23:00:00') };
+    }
+
+    /**
+     * Résumé météo d'une campagne à partir des heures DPClim (J-3 -> J).
+     * hMin / hMax : première et dernière heure de mesure (« HH:MM »), pour la plage de la campagne.
+     * Seuils chaleur : moyennes sur 3 jours des Tn et Tx (repère indicatif canicule Nord : 18 / 33 °C).
+     */
+    function resumerCampagne(rows, dateIso, hMin, hMax) {
+        if (!rows || !rows.length) return null;
+        const heure = (ts) => new Date(ts).getHours();
+        const parJour = (iso) => rows.filter((r) => jourLocal(r.ts) === iso);
+        const jour = parJour(dateIso);
+        const h0 = hMin ? parseInt(hMin, 10) : 9;
+        const h1 = hMax ? Math.min(23, parseInt(hMax, 10) + (hMax.slice(3) !== '00' ? 1 : 0)) : 17;
+        const plage = jour.filter((r) => heure(r.ts) >= h0 && heure(r.ts) <= h1);
+        const debutJour = new Date(dateIso + 'T00:00:00').getTime();
+        const avant72 = rows.filter((r) => r.ts < debutJour && r.ts >= debutJour - 72 * 3600 * 1000);
+        const txJour = (iso) => { const j = parJour(iso); return maxi(j.map((r) => (r.tx !== null ? r.tx : r.t))); };
+        const tnJour = (iso) => { const j = parJour(iso); return mini(j.map((r) => (r.tn !== null ? r.tn : r.t))); };
+        const jPrec = [-3, -2, -1].map((n) => decalerJour(dateIso, n));
+        const j3 = [-2, -1, 0].map((n) => decalerJour(dateIso, n));
+        const tn3 = moyenne(j3.map(tnJour));
+        const tx3 = moyenne(j3.map(txJour));
+        const r = {
+            date: dateIso,
+            heures: jour.length,
+            plage: `${String(h0).padStart(2, '0')}h–${String(h1).padStart(2, '0')}h`,
+            txJ: txJour(dateIso), tnJ: tnJour(dateIso),
+            tPlage: moyenne(plage.map((x) => x.t)),
+            huPlage: moyenne(plage.map((x) => x.u)),
+            solarPlage: moyenne(plage.map((x) => x.solar)),
+            nebPlage: moyenne(plage.map((x) => x.n)),
+            ventPlage: moyenne(plage.map((x) => x.ff)),
+            rafaleJ: maxi(jour.map((x) => x.rafale)),
+            pluieJ: somme(jour.map((x) => x.rr)),
+            pluie72: somme(avant72.map((x) => x.rr)),
+            tx3avant: moyenne(jPrec.map(txJour)),
+            tn3avant: moyenne(jPrec.map(tnJour)),
+            tn3, tx3
+        };
+        r.radiative = r.solarPlage !== null ? (r.solarPlage >= 400 && (r.nebPlage === null || r.nebPlage <= 4) && (r.ventPlage === null || r.ventPlage <= 20)) : null;
+        r.solHumide = r.pluie72 !== null ? r.pluie72 >= 5 : null;
+        r.chaleur = tn3 !== null && tx3 !== null ? (tn3 >= 18 && tx3 >= 33) : null;
+        return r;
+    }
+
+    // Critères de comparabilité : écart toléré au-delà duquel le critère vaut 0
+    const CRITERES_COMPARABILITE = [
+        { cle: 'txJ', nom: 'T max du jour', unite: '°C', tol: 4 },
+        { cle: 'tPlage', nom: 'T air pendant les mesures', unite: '°C', tol: 3 },
+        { cle: 'solarPlage', nom: 'Rayonnement pendant les mesures', unite: 'W/m²', tol: 150 },
+        { cle: 'nebPlage', nom: 'Nébulosité pendant les mesures', unite: 'octas', tol: 3 },
+        { cle: 'ventPlage', nom: 'Vent pendant les mesures', unite: 'km/h', tol: 8 },
+        { cle: 'pluie72', nom: 'Pluie des 72 h précédentes', unite: 'mm', tol: 5 },
+        { cle: 'tx3avant', nom: 'T max moyenne des 3 jours précédents', unite: '°C', tol: 4 }
+    ];
+
+    function scoreComparabilite(a, b) {
+        if (!a || !b) return null;
+        const details = [];
+        for (const c of CRITERES_COMPARABILITE) {
+            if (a[c.cle] === null || a[c.cle] === undefined || b[c.cle] === null || b[c.cle] === undefined) continue;
+            const ecart = Math.abs(a[c.cle] - b[c.cle]);
+            details.push({ ...c, ecart, score: Math.max(0, 1 - ecart / c.tol) });
+        }
+        if (details.length < 3) return null;
+        return { score: Math.round(100 * details.reduce((s, d) => s + d.score, 0) / details.length), details };
+    }
+
+    /** Température de référence interpolée (linéaire) à un instant donné (ms). */
+    function temperatureA(rows, ts) {
+        if (!rows || !rows.length) return null;
+        let avant = null, apres = null;
+        for (const r of rows) {
+            if (r.t === null) continue;
+            if (r.ts <= ts) avant = r;
+            if (r.ts >= ts) { apres = r; break; }
+        }
+        if (avant && apres) {
+            if (apres.ts === avant.ts) return avant.t;
+            if (apres.ts - avant.ts > 3 * 3600 * 1000) return null;
+            return avant.t + (apres.t - avant.t) * (ts - avant.ts) / (apres.ts - avant.ts);
+        }
+        const proche = avant || apres;
+        return proche && Math.abs(proche.ts - ts) <= 3600 * 1000 ? proche.t : null;
     }
 
     async function appelWeatherLink(chemin, reglages, jetonSession, cleAnon, relaisParDefaut, parametres) {
@@ -287,10 +521,40 @@
         return res;
     }
 
+    /** Aperçu masqué d'une clé (longueur + 4 premiers et 4 derniers caractères) pour vérifier une saisie. */
+    function apercuCle(cle) {
+        const c = String(cle || '');
+        if (!c) return 'vide';
+        if (c.length <= 10) return `${c.length} caractères`;
+        return `${c.length} caractères : ${c.slice(0, 4)}…${c.slice(-4)}`;
+    }
+
+    /**
+     * Test WeatherLink : liste des stations. En cas de refus (401), réessaie avec clé et secret inversés
+     * (erreur de saisie fréquente) et le signale.
+     */
+    async function testerWeatherLink(reglages, jeton, cleAnon, relaisParDefaut) {
+        try {
+            return { stations: await weatherLinkStations(reglages, jeton, cleAnon, relaisParDefaut), inverses: false };
+        } catch (e) {
+            if (!/erreur 401/.test(e.message)) throw e;
+            const inverse = Object.assign({}, reglages, { wlApiKey: reglages.wlApiSecret, wlApiSecret: reglages.wlApiKey });
+            try {
+                return { stations: await weatherLinkStations(inverse, jeton, cleAnon, relaisParDefaut), inverses: true };
+            } catch (e2) {
+                throw new Error('WeatherLink refuse la clé et le secret (401 « Invalid authentication credentials »), même inversés. ' +
+                    `Clé saisie : ${apercuCle(reglages.wlApiKey)} ; secret : ${apercuCle(reglages.wlApiSecret)}. ` +
+                    'Compare-les avec ceux de ton autre programme ou génère une nouvelle paire sur weatherlink.com > Account.');
+            }
+        }
+    }
+
     global.Meteo = {
         lireReglages, ecrireReglages, effacerCles, REGLAGES_DEFAUT,
         lireWeatherLinkActuel, lireWeatherLinkStations, lireMeteoFranceObs, lirePrevisions,
-        previsions, meteoFranceObs, weatherLinkStations, weatherLinkActuel,
+        previsions, meteoFranceObs, weatherLinkStations, weatherLinkActuel, testerWeatherLink, testerMeteoFrance,
+        lireCsvDPClim, dpclimHoraire, fenetreCampagne, resumerCampagne, scoreComparabilite, CRITERES_COMPARABILITE,
+        temperatureA, messageErreurMeteoFrance, apercuCle, jourLocal, decalerJour,
         directionTexte, temps,
         conv: { fVersC, mphVersKmh, msVersKmh, inHgVersHpa, kelvinOuCelsius, paOuHpa }
     };

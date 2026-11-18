@@ -167,6 +167,7 @@
                     <span v-if="meteoActuelle" class="truncate text-slate-700">
                         {{ fmt(meteoActuelle.t, 1) }} °C · {{ fmt(meteoActuelle.hr, 0) }} % · {{ fmt(meteoActuelle.vent, 0) }} km/h {{ directionTexte(meteoActuelle.ventDir) }}
                         <span v-if="meteoActuelle.rayonnement !== null"> · {{ fmt(meteoActuelle.rayonnement, 0) }} W/m²</span>
+                        <span v-if="!meteoActuelle.date" class="text-amber-700"> (modèle)</span>
                     </span>
                     <span v-else-if="meteoChargement" class="text-slate-500">Chargement…</span>
                     <span v-else-if="meteoErreur" class="truncate text-red-600">{{ meteoErreur }}</span>
@@ -200,7 +201,7 @@
                     <div class="bg-white rounded p-2 border"><div class="text-[10px] text-gray-500 uppercase">Pression</div><div class="font-bold">{{ meteoActuelle.pression !== null ? fmt(meteoActuelle.pression, 0) + ' hPa' : '—' }}</div></div>
                 </div>
                 <div v-if="meteoActuelle" class="text-[11px] text-slate-500">
-                    {{ meteoActuelle.source }} · relevé de {{ meteoActuelle.date ? meteoActuelle.date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '?' }}
+                    {{ meteoActuelle.source }}<span v-if="meteoActuelle.date"> · relevé de {{ meteoActuelle.date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) }}</span>
                 </div>
 
                 <div>
@@ -393,75 +394,178 @@
                 </div>
             </div>
 
-            <div v-if="activeTab === 'comparaison'" class="space-y-6">
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <h2 class="text-lg font-bold text-purple-600 mb-4 border-b pb-2">Comparer des campagnes locales</h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <h3 class="font-bold text-sm text-gray-700 mb-2">🔴 Campagne A</h3>
-                            <select v-model="compA.etablissement" @change="onCompAChange" class="w-full p-2 mb-2 border rounded bg-white text-sm">
-                                <option v-for="etab in listeEtablissements" :key="etab" :value="etab">{{ etab }}</option>
-                            </select>
-                            <select v-model="compA.date" @change="updateComparaisonChart" class="w-full p-2 border rounded bg-white text-sm" :disabled="datesDisponiblesA.length === 0">
-                                <option value="" disabled v-if="datesDisponiblesA.length === 0">Aucune donnée disponible</option>
-                                <option v-for="d in datesDisponiblesA" :key="d" :value="d">{{ d }}</option>
-                            </select>
-                        </div>
+            <div v-if="activeTab === 'comparaison'" class="space-y-5">
 
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <h3 class="font-bold text-sm text-gray-700 mb-2">🔵 Campagne B</h3>
-                            <select v-model="compB.etablissement" @change="onCompBChange" class="w-full p-2 mb-2 border rounded bg-white text-sm">
-                                <option v-for="etab in listeEtablissements" :key="etab" :value="etab">{{ etab }}</option>
-                            </select>
-                            <select v-model="compB.date" @change="updateComparaisonChart" class="w-full p-2 border rounded bg-white text-sm" :disabled="datesDisponiblesB.length === 0">
-                                <option value="" disabled v-if="datesDisponiblesB.length === 0">Aucune donnée disponible</option>
-                                <option v-for="d in datesDisponiblesB" :key="d" :value="d">{{ d }}</option>
-                            </select>
-                        </div>
+                <!-- ===== 1. Campagnes et météo de référence ===== -->
+                <section class="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="flex flex-wrap items-center gap-2 border-b pb-2 mb-2">
+                        <h2 class="text-lg font-bold text-purple-600 flex-1 min-w-[200px]">Campagnes et météo de Lille-Lesquin</h2>
+                        <select v-model="compFiltreEtab" class="p-2 border rounded text-sm bg-white">
+                            <option value="Tous">Toutes les écoles</option>
+                            <option v-for="e in listeEtablissements" :key="e" :value="e">{{ e }}</option>
+                        </select>
+                        <button @click="chargerMeteoCampagnes(false)" :disabled="meteoCampChargement" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded font-bold text-xs">
+                            {{ meteoCampChargement ? 'Chargement…' : '☁️ Charger la météo manquante' }}
+                        </button>
                     </div>
+                    <p class="text-xs text-gray-500 mb-2">Données climatologiques horaires de Météo-France (station {{ reglagesMeteo.mfStationNom }}), du jour J-3 au jour J, en heure locale. « Pendant les mesures » couvre la plage entre la première et la dernière mesure de la campagne. Coche de 2 à 8 campagnes à comparer.</p>
+                    <p v-if="meteoCampStatut" class="text-xs mb-2 p-2 rounded" :class="meteoCampErreur ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'">{{ meteoCampStatut }}</p>
+                    <div class="overflow-x-auto border rounded-lg">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr>
+                                    <th class="p-2 text-left">✓</th>
+                                    <th class="p-2 text-left">Campagne</th>
+                                    <th class="p-2 text-left">Phase</th>
+                                    <th class="p-2">Mesures</th>
+                                    <th class="p-2" title="Température maximale du jour">Tx J</th>
+                                    <th class="p-2" title="Température moyenne pendant les mesures">T mesures</th>
+                                    <th class="p-2" title="Rayonnement global moyen pendant les mesures">Rayon.</th>
+                                    <th class="p-2" title="Nébulosité moyenne pendant les mesures (octas)">Nébul.</th>
+                                    <th class="p-2" title="Vent moyen pendant les mesures">Vent</th>
+                                    <th class="p-2" title="Pluie du jour">Pluie J</th>
+                                    <th class="p-2" title="Pluie des 72 heures précédentes">Pluie 72 h</th>
+                                    <th class="p-2" title="Moyenne des Tx des jours J-3 à J-1">Tx J-3→J-1</th>
+                                    <th class="p-2 text-left">Repères</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="c in campagnesFiltrees" :key="c.cle" class="border-t" :class="estSelectionnee(c.cle) ? 'bg-purple-50' : ''">
+                                    <td class="p-2"><input type="checkbox" class="w-4 h-4" :checked="estSelectionnee(c.cle)" @change="basculerSelection(c.cle)"></td>
+                                    <td class="p-2 whitespace-nowrap">
+                                        <b>{{ formatDateCourte(c.date) }}</b>
+                                        <div class="text-[10px] text-gray-500">{{ c.etablissement }} · {{ c.nbSurface }} surf. / {{ c.nbAir }} air</div>
+                                    </td>
+                                    <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold" :class="c.phase.classe">{{ c.phase.nom }}</span></td>
+                                    <td class="p-2 text-center whitespace-nowrap">{{ c.heureMin }}–{{ c.heureMax }}</td>
+                                    <template v-if="c.meteo">
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.txJ, 1) }}°</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.tPlage, 1) }}°</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.solarPlage, 0) }}</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.nebPlage, 1) }}</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.ventPlage, 0) }}</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.pluieJ, 1) }}</td>
+                                        <td class="p-2 text-center" :class="c.meteo.solHumide ? 'text-blue-700 font-bold' : ''">{{ fmt(c.meteo.pluie72, 1) }}</td>
+                                        <td class="p-2 text-center">{{ fmt(c.meteo.tx3avant, 1) }}°</td>
+                                        <td class="p-2 whitespace-nowrap text-sm">
+                                            <span v-if="c.meteo.radiative === true" title="Journée radiative">☀️</span>
+                                            <span v-else-if="c.meteo.radiative === false" title="Journée peu ensoleillée ou ventée">☁️</span>
+                                            <span v-if="c.meteo.solHumide" title="Sol humidifié par la pluie des 72 h">💧</span>
+                                            <span v-if="c.meteo.chaleur" title="Seuils de chaleur atteints">🔥</span>
+                                        </td>
+                                    </template>
+                                    <td v-else colspan="9" class="p-2 text-gray-400 italic">{{ c.meteoVide ? 'pas de données Météo-France pour cette date' : 'météo non chargée' }}</td>
+                                </tr>
+                                <tr v-if="!campagnesFiltrees.length"><td colspan="13" class="p-3 text-gray-500">Aucune campagne enregistrée.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-1">☀️ journée radiative (rayonnement ≥ 400 W/m², nébulosité ≤ 4 octas, vent ≤ 20 km/h) · ☁️ journée peu radiative · 💧 sol humidifié (≥ 5 mm sur 72 h) · 🔥 moyennes sur 3 jours des Tn ≥ 18 °C et des Tx ≥ 33 °C (repère indicatif de chaleur pour le Nord, pas une vigilance officielle).</p>
+                </section>
 
-                    <div class="flex flex-col md:flex-row md:items-center gap-4 mb-4 bg-gray-50 p-3 rounded-lg border">
-                        <div class="flex items-center">
-                            <label class="text-xs font-bold text-gray-700 mr-2">Paramètre :</label>
-                            <select v-model="compParam" @change="updateComparaisonChart" class="p-2 border rounded bg-white text-sm">
-                                <optgroup label="Mesure de Surface">
-                                    <option value="tSurface">T° Surface</option>
-                                </optgroup>
-                                <optgroup label="Thermique Air & Confort">
-                                    <option value="tAir">T° Air</option>
-                                    <option value="wbgt">WBGT</option>
-                                    <option value="wb">WB</option>
-                                    <option value="hi">HI</option>
-                                    <option value="gt">GT</option>
-                                    <option value="dpt">DPT</option>
-                                </optgroup>
-                                <optgroup label="Conditions Atmosphériques">
-                                    <option value="hr">Humidité (HR %)</option>
-                                    <option value="pression">Pression (hPa)</option>
-                                </optgroup>
-                            </select>
+                <!-- ===== 2. Comparabilité ===== -->
+                <section class="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 class="text-lg font-bold text-purple-600 border-b pb-2 mb-2">Quelles campagnes peut-on comparer ?</h2>
+                    <p class="text-xs text-gray-500 mb-3">Score de 0 à 100 calculé sur la météo de Lille-Lesquin : T max du jour, T et rayonnement pendant les mesures, nébulosité, vent, pluie des 72 h et chaleur des 3 jours précédents. <b class="text-green-700">≥ 80</b> comparables · <b class="text-amber-600">60–79</b> avec prudence · <b class="text-red-600">&lt; 60</b> conditions trop différentes.</p>
+
+                    <div v-if="pairesSuggerees.length" class="mb-4">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">{{ pairesSuggereesTitre }}</h3>
+                        <ul class="space-y-1.5">
+                            <li v-for="p in pairesSuggerees" :key="p.cle" class="flex items-center gap-2 border rounded-lg p-2 text-xs">
+                                <span class="w-10 text-center font-bold rounded py-1" :class="classeScore(p.score)">{{ p.score }}</span>
+                                <span class="flex-1 min-w-0">
+                                    <b>{{ p.a.etablissement }}</b> : {{ formatDateCourte(p.a.date) }} <span class="text-gray-500">({{ p.a.phase.nom }})</span>
+                                    ↔ {{ formatDateCourte(p.b.date) }} <span class="text-gray-500">({{ p.b.phase.nom }})</span>
+                                </span>
+                                <button @click="comparerPaire(p)" class="bg-purple-100 text-purple-800 font-bold px-2 py-1 rounded shrink-0">Comparer</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <p v-else class="text-xs text-gray-500 mb-3">Charge la météo des campagnes pour obtenir les suggestions.</p>
+
+                    <div v-if="matriceSelection.campagnes.length >= 2">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Matrice des campagnes cochées</h3>
+                        <div class="overflow-x-auto">
+                            <table class="text-xs border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="p-1"></th>
+                                        <th v-for="c in matriceSelection.campagnes" :key="'h' + c.cle" class="p-1 font-bold whitespace-nowrap">{{ etiquetteCourte(c) }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(ligne, i) in matriceSelection.lignes" :key="'l' + i">
+                                        <th class="p-1 text-left whitespace-nowrap">{{ etiquetteCourte(matriceSelection.campagnes[i]) }}</th>
+                                        <td v-for="(cell, j) in ligne" :key="'c' + i + '-' + j" class="p-1 text-center border w-14" :class="i === j ? 'bg-gray-100' : classeScore(cell && cell.score)" :title="cell ? cell.titre : ''">
+                                            {{ i === j ? '—' : (cell ? cell.score : '?') }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
+                        <p class="text-[10px] text-gray-500 mt-1">Survole (ou appuie sur) une case pour voir le détail des écarts.</p>
+                    </div>
+                    <p v-else class="text-xs text-gray-500">Coche au moins deux campagnes dont la météo est chargée pour afficher la matrice.</p>
+                </section>
 
-                        <div class="flex items-center">
-                            <label class="text-xs font-bold text-gray-700 mr-2">Cibler un point :</label>
-                            <select v-model="compFiltrePoint" @change="updateComparaisonChart" class="p-2 border rounded bg-white text-sm">
-                                <option value="Tous">Tous les points</option>
+                <!-- ===== 3. Graphique multi-campagnes ===== -->
+                <section class="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 class="text-lg font-bold text-purple-600 border-b pb-2 mb-3">Comparer les campagnes cochées</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                        <label class="text-xs font-bold text-gray-700">Paramètre
+                            <select v-model="compParam" @change="updateComparaisonChart" class="mt-1 w-full p-2 border rounded bg-white text-sm font-normal">
+                                <optgroup label="Mesure de surface"><option value="tSurface">T° Surface</option></optgroup>
+                                <optgroup label="Air & confort">
+                                    <option value="tAir">T° Air</option><option value="wbgt">WBGT</option><option value="wb">WB</option>
+                                    <option value="hi">HI</option><option value="gt">GT (globe)</option><option value="dpt">DPT</option>
+                                </optgroup>
+                                <optgroup label="Conditions"><option value="hr">Humidité (HR %)</option><option value="pression">Pression (hPa)</option></optgroup>
+                            </select>
+                        </label>
+                        <label class="text-xs font-bold text-gray-700">Points
+                            <select v-model="compFiltrePoint" @change="updateComparaisonChart" class="mt-1 w-full p-2 border rounded bg-white text-sm font-normal">
+                                <option value="moyenne">Moyenne de tous les points (par demi-heure)</option>
+                                <option value="tous">Tous les points séparément</option>
                                 <option v-for="pt in listePointsComparaison" :key="pt" :value="pt">Point {{ pt }}</option>
                             </select>
-                        </div>
-
-                        <span class="text-xs text-gray-500 ml-auto italic">💡 Cliquez sur la légende pour isoler des courbes.</span>
+                        </label>
+                        <label class="text-xs font-bold text-gray-700">Valeurs
+                            <select v-model="compMode" @change="updateComparaisonChart" class="mt-1 w-full p-2 border rounded bg-white text-sm font-normal">
+                                <option value="brut">Valeurs mesurées</option>
+                                <option value="ecart" :disabled="!paramTemperature">Écart à la T° air de Lille-Lesquin</option>
+                            </select>
+                        </label>
                     </div>
-
-                    <div class="relative h-[500px] w-full">
+                    <p v-if="compMode === 'ecart'" class="text-xs bg-purple-50 text-purple-900 p-2 rounded mb-2">Chaque mesure est diminuée de la température de l'air à Lille-Lesquin au même instant (interpolée entre deux heures). Les écarts de météo entre les jours sont ainsi neutralisés : on compare l'effet propre de la cour.</p>
+                    <p v-if="!selectionCampagnes.length" class="text-sm text-gray-500 p-4 text-center border-2 border-dashed rounded-lg">Coche des campagnes dans le tableau ci-dessus, ou clique sur « Comparer » dans une suggestion.</p>
+                    <div v-show="selectionCampagnes.length" class="relative h-[420px] md:h-[500px] w-full">
                         <canvas id="comparaisonChart"></canvas>
                     </div>
-                </div>
+                    <ul v-if="avertissementsComparaison.length" class="text-xs text-amber-700 mt-2 list-disc pl-5">
+                        <li v-for="a in avertissementsComparaison" :key="a">{{ a }}</li>
+                    </ul>
+                    <div v-if="statsComparaison.length" class="overflow-x-auto mt-3 border rounded-lg">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr><th class="p-2 text-left">Campagne</th><th class="p-2">Mesures</th><th class="p-2">Moyenne</th><th class="p-2">Min</th><th class="p-2">Max</th><th v-if="paramTemperature" class="p-2" title="Moyenne de (mesure − T air Lille-Lesquin)">Écart moyen à Lesquin</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="s in statsComparaison" :key="s.cle" class="border-t">
+                                    <td class="p-2 whitespace-nowrap"><span class="inline-block w-3 h-3 rounded-full mr-1 align-middle" :style="{ background: s.couleur }"></span>{{ s.nom }}</td>
+                                    <td class="p-2 text-center">{{ s.n }}</td>
+                                    <td class="p-2 text-center font-bold">{{ fmt(s.moyenne, 1) }}</td>
+                                    <td class="p-2 text-center">{{ fmt(s.min, 1) }}</td>
+                                    <td class="p-2 text-center">{{ fmt(s.max, 1) }}</td>
+                                    <td v-if="paramTemperature" class="p-2 text-center">{{ s.ecartMoyen === null ? '—' : (s.ecartMoyen > 0 ? '+' : '') + fmt(s.ecartMoyen, 1) + ' °C' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mt-6">
-                    <h2 class="text-lg font-bold text-blue-600 mb-1 border-b pb-2">Comparaison Analogique Météo-France (CSV)</h2>
-                    <p class="text-[11px] text-gray-500 mb-4">Les heures des fichiers Météo-France (UTC) sont converties en heure locale.</p>
+                <details class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm" @toggle="updateMeteoApp">
+                    <summary class="text-sm font-bold text-blue-600 cursor-pointer">Import manuel de fichiers CSV Météo-France (ancienne méthode)</summary>
+                    <p class="text-[11px] text-gray-500 my-3">Les heures des fichiers Météo-France (UTC) sont converties en heure locale.</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-gray-50 p-4 rounded-lg border">
                         <div>
@@ -523,7 +627,7 @@
                             </table>
                         </div>
                     </div>
-                </div>
+                </details>
             </div>
             
         </main>
@@ -593,6 +697,7 @@
                         <input v-model.trim="parametresSaisie.wlApiKey" :type="voirCles ? 'text' : 'password'" autocomplete="off" class="w-full p-2.5 border rounded-lg font-mono text-xs">
                         <label class="block text-xs font-bold text-gray-700">API Secret</label>
                         <input v-model.trim="parametresSaisie.wlApiSecret" :type="voirCles ? 'text' : 'password'" autocomplete="off" class="w-full p-2.5 border rounded-lg font-mono text-xs">
+                        <p class="text-[11px] text-gray-500">Clé : {{ apercuCle(parametresSaisie.wlApiKey) }} · Secret : {{ apercuCle(parametresSaisie.wlApiSecret) }}</p>
                         <details class="text-xs text-gray-600">
                             <summary class="cursor-pointer">Relais WeatherLink (avancé)</summary>
                             <p class="mt-1">WeatherLink refuse les appels directs depuis un navigateur. L'application passe par un petit relais Supabase qui transmet la demande <b>sans rien enregistrer</b>. Adresse par défaut :</p>
@@ -615,8 +720,8 @@
                     <!-- Météo-France -->
                     <div class="bg-white border rounded-lg p-3 space-y-2">
                         <h3 class="font-bold text-slate-800">Station de référence – Météo-France</h3>
-                        <p class="text-xs text-gray-500">Clé API du portail portail-api.meteofrance.fr (application abonnée à « Données d'observation » ; « Données climatologiques » servira pour l'historique J-3).</p>
-                        <label class="block text-xs font-bold text-gray-700">Clé API Météo-France</label>
+                        <p class="text-xs text-gray-500">Portail portail-api.meteofrance.fr : ton application doit être abonnée à <b>« Données d'observation »</b> (bandeau) et <b>« Données climatologiques »</b> (comparaison des campagnes). Génère une <b>API Key</b> avec une longue durée de validité : un « token » ne dure qu'1 heure.</p>
+                        <label class="block text-xs font-bold text-gray-700">Clé API Météo-France (API Key)</label>
                         <input v-model.trim="parametresSaisie.mfApiKey" :type="voirCles ? 'text' : 'password'" autocomplete="off" class="w-full p-2.5 border rounded-lg font-mono text-xs">
                         <div class="grid grid-cols-2 gap-2">
                             <div>
@@ -628,9 +733,11 @@
                                 <input v-model.trim="parametresSaisie.mfStationNom" class="w-full p-2.5 border rounded-lg">
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 pt-1">
-                            <button @click="testerMeteoFrance" class="bg-sky-700 text-white px-3 py-2 rounded font-bold text-xs">Tester</button>
-                            <span class="text-xs" :class="testMF.ok ? 'text-green-700' : 'text-red-600'">{{ testMF.message }}</span>
+                        <div class="pt-1 space-y-1">
+                            <button @click="testerMeteoFrance" class="bg-sky-700 text-white px-3 py-2 rounded font-bold text-xs">Tester les deux API</button>
+                            <p v-if="testMF.message" class="text-xs text-gray-600">{{ testMF.message }}</p>
+                            <p v-if="testMF.obs" class="text-xs" :class="testMF.obs.ok ? 'text-green-700' : 'text-red-600'">{{ testMF.obs.ok ? '✅' : '❌' }} Données d'observation (bandeau) : {{ testMF.obs.message }}</p>
+                            <p v-if="testMF.clim" class="text-xs" :class="testMF.clim.ok ? 'text-green-700' : 'text-red-600'">{{ testMF.clim.ok ? '✅' : '❌' }} Données climatologiques (comparaison) : {{ testMF.clim.message }}</p>
                         </div>
                     </div>
 
@@ -681,7 +788,7 @@
         leurs données s'il changeait. La version affichée est APP_VERSION ci-dessous.
     -->
     <script>
-        const APP_VERSION = '2.0.0';
+        const APP_VERSION = '2.1.0';
         const { createApp, ref, computed, onMounted, nextTick, watch, onUnmounted } = Vue;
 
         const SUPABASE_URL = 'https://nxtlihyemnrzbxhezryf.supabase.co';
@@ -756,9 +863,7 @@
                 const loginEnCours = ref(false);
                 const pendingDeletes = ref(JSON.parse(localStorage.getItem('suppressions_en_attente') || '[]'));
 
-                // --- Variables Comparaison Locales ---
-                const compA = ref({ etablissement: 'Thierry Launay', date: dateCampagne.value });
-                const compB = ref({ etablissement: 'Jean Jacques Rousseau', date: dateCampagne.value });
+                // --- Comparaison des campagnes ---
                 const compParam = ref('tAir');
                 let comparaisonChartInstance = null;
 
@@ -795,42 +900,7 @@
                 let pickerMapInstance = null;
                 let pickerMarker = null;
 
-                const compFiltrePoint = ref('Tous');
-                const listePointsComparaison = computed(() => {
-                    const points = new Set();
-                    const etabA = etablissementsData.value.find(e => e.nom === compA.value.etablissement);
-                    const etabB = etablissementsData.value.find(e => e.nom === compB.value.etablissement);
-                    
-                    if (etabA) etabA.points.forEach(p => points.add(p.id));
-                    if (etabB) etabB.points.forEach(p => points.add(p.id));
-                    
-                    return Array.from(points).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
-                });
-                
-                const datesDisponiblesA = computed(() => {
-                    const dates = new Set();
-                    [...db.value.surface, ...db.value.air].forEach(m => {
-                        if (m.etablissement === compA.value.etablissement && m.date) dates.add(m.date);
-                    });
-                    return Array.from(dates).sort((a,b) => b.localeCompare(a));
-                });
-
-                const datesDisponiblesB = computed(() => {
-                    const dates = new Set();
-                    [...db.value.surface, ...db.value.air].forEach(m => {
-                        if (m.etablissement === compB.value.etablissement && m.date) dates.add(m.date);
-                    });
-                    return Array.from(dates).sort((a,b) => b.localeCompare(a));
-                });
-
-                const onCompAChange = () => {
-                    compA.value.date = datesDisponiblesA.value.length > 0 ? datesDisponiblesA.value[0] : '';
-                    updateComparaisonChart();
-                };
-                const onCompBChange = () => {
-                    compB.value.date = datesDisponiblesB.value.length > 0 ? datesDisponiblesB.value[0] : '';
-                    updateComparaisonChart();
-                };
+                // (variables de comparaison définies plus bas, section COMPARAISON DES CAMPAGNES)
 
 
                 // ==========================================
@@ -1908,85 +1978,7 @@ const initMap = () => {
                     }
                 };
 
-                const updateComparaisonChart = () => {
-                    if (activeTab.value !== 'comparaison') return;
-                    
-                    nextTick(() => {
-                        const ctx = document.getElementById('comparaisonChart');
-                        if (!ctx) return;
-
-                        if (comparaisonChartInstance) comparaisonChartInstance.destroy();
-
-                        const type = compParam.value;
-                        const table = type === 'tSurface' ? 'surface' : 'air';
-
-                        const getDatasetsForCampaign = (campagneConfig, prefix, colorPalette) => {
-                            if (!campagneConfig.date || !campagneConfig.etablissement) return [];
-
-                            const datasets = [];
-                            const etabData = etablissementsData.value.find(e => e.nom === campagneConfig.etablissement);
-                            if (!etabData) return [];
-
-                            const mesures = db.value[table].filter(m => 
-                                m.etablissement === campagneConfig.etablissement && 
-                                m.date === campagneConfig.date &&
-                                m[type] !== null && m[type] !== undefined && m[type] !== ''
-                            );
-
-                            etabData.points.forEach((p, index) => {
-                                if (compFiltrePoint.value !== 'Tous' && p.id !== compFiltrePoint.value) return;
-
-                                const mesuresPoint = mesures.filter(m => m.point === p.id);
-                                if (mesuresPoint.length === 0) return;
-
-                                const dataDict = {};
-                                mesuresPoint.forEach(m => { dataDict[m.heure] = parseFloat(m[type]); });
-                                
-                                const color = colorPalette[index % colorPalette.length];
-
-                                datasets.push({
-                                    label: `[${prefix}] Pt ${p.id} - ${campagneConfig.etablissement}`,
-                                    dataDict: dataDict,
-                                    borderColor: color, backgroundColor: color, borderWidth: 2, tension: 0.3, spanGaps: true, fill: false, pointRadius: 4
-                                });
-                            });
-                            return datasets;
-                        };
-
-                        const paletteA = ['#ef4444', '#f97316', '#f59e0b', '#dc2626', '#ea580c', '#b91c1c'];
-                        const paletteB = ['#3b82f6', '#0ea5e9', '#06b6d4', '#2563eb', '#0284c7', '#1d4ed8'];
-
-                        const rawDatasetsA = getDatasetsForCampaign(compA.value, 'A', paletteA);
-                        const rawDatasetsB = getDatasetsForCampaign(compB.value, 'B', paletteB);
-
-                        const toutesLesHeures = new Set();
-                        [...rawDatasetsA, ...rawDatasetsB].forEach(ds => {
-                            Object.keys(ds.dataDict).forEach(h => toutesLesHeures.add(h));
-                        });
-                        const labels = Array.from(toutesLesHeures).sort((a, b) => a.localeCompare(b));
-
-                        const finalDatasets = [...rawDatasetsA, ...rawDatasetsB].map(ds => {
-                            const dataArray = labels.map(h => ds.dataDict[h] !== undefined ? ds.dataDict[h] : null);
-                            return {
-                                label: ds.label, data: dataArray, borderColor: ds.borderColor, backgroundColor: ds.backgroundColor,
-                                borderWidth: ds.borderWidth, tension: ds.tension, spanGaps: ds.spanGaps, pointRadius: ds.pointRadius, fill: ds.fill
-                            };
-                        });
-
-                        comparaisonChartInstance = new Chart(ctx, {
-                            type: 'line',
-                            data: { labels: labels, datasets: finalDatasets },
-                            options: {
-                                responsive: true, maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-                                    tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ${getUnit(type)}` } }
-                                },
-                                scales: { y: { title: { display: true, text: `${getLabel(type)} (${getUnit(type)})` } } }
-                            }
-                        });
-                    });
-                };
+                // updateComparaisonChart : voir section COMPARAISON DES CAMPAGNES
 
                 const updateLegend = () => {
                     const legendGradient = document.getElementById('legend-gradient');
@@ -2126,10 +2118,13 @@ const initMap = () => {
                 const sauverReglagesMeteo = () => Meteo.ecrireReglages(reglagesMeteo.value);
                 const initiales = (nom) => (nom || '').split(/[\s-]+/).filter(Boolean).map(m => m[0].toUpperCase()).join('').slice(0, 4);
 
+                // Stations Davis connues des deux écoles (utilisées si aucun ID n'est saisi dans Établissements & points)
+                const STATIONS_CONNUES = { 'Thierry Launay': '149569', 'Jean Jacques Rousseau': '183318' };
                 const stationsDisponibles = computed(() => {
                     const liste = [];
                     for (const e of etablissementsData.value) {
-                        if (e.nom && e.stationWL) liste.push({ cle: 'WL:' + String(e.stationWL).trim(), type: 'WL', id: String(e.stationWL).trim(), nom: e.nom, court: initiales(e.nom), etab: e.nom });
+                        const id = String(e.stationWL || STATIONS_CONNUES[e.nom] || '').trim();
+                        if (e.nom && id) liste.push({ cle: 'WL:' + id, type: 'WL', id, nom: e.nom, court: initiales(e.nom), etab: e.nom });
                     }
                     const nomMF = reglagesMeteo.value.mfStationNom || 'Météo-France';
                     liste.push({ cle: 'MF', type: 'MF', id: reglagesMeteo.value.mfStation, nom: nomMF + ' (Météo-France)', court: 'MF ' + nomMF.split('-').pop() });
@@ -2178,8 +2173,14 @@ const initMap = () => {
                         meteoActuelle.value = actu.value;
                         meteoErreur.value = '';
                     } else {
-                        meteoActuelle.value = null;
                         meteoErreur.value = actu.reason ? actu.reason.message : 'Observation indisponible.';
+                        // Repli : heure en cours du modèle AROME, clairement signalée comme modèle
+                        const p = previsionsMeteo.value[0];
+                        meteoActuelle.value = p ? {
+                            source: 'Modèle AROME (pas une mesure)', date: null,
+                            t: p.t, hr: p.hr, vent: p.vent, rafale: p.rafale, ventDir: p.ventDir,
+                            pluieJour: null, pluiePeriode: p.pluie, rayonnement: p.rayonnement, pression: null
+                        } : null;
                     }
                     meteoChargement.value = false;
                 };
@@ -2236,26 +2237,26 @@ const initMap = () => {
                     testWL.value = { ok: false, message: 'Test en cours…' };
                     try {
                         const jeton = session.value ? session.value.access_token : null;
-                        const liste = await Meteo.weatherLinkStations({ ...reglagesMeteo.value, ...parametresSaisie.value }, jeton, SUPABASE_KEY, relaisParDefaut);
-                        stationsWL.value = liste;
-                        localStorage.setItem('stations_wl_cache', JSON.stringify(liste));
-                        testWL.value = { ok: true, message: `✅ ${liste.length} station(s) trouvée(s).` };
+                        const { stations, inverses } = await Meteo.testerWeatherLink({ ...reglagesMeteo.value, ...parametresSaisie.value }, jeton, SUPABASE_KEY, relaisParDefaut);
+                        if (inverses) {
+                            const p = parametresSaisie.value;
+                            parametresSaisie.value = { ...p, wlApiKey: p.wlApiSecret, wlApiSecret: p.wlApiKey };
+                        }
+                        stationsWL.value = stations;
+                        localStorage.setItem('stations_wl_cache', JSON.stringify(stations));
+                        testWL.value = { ok: true, message: `✅ ${stations.length} station(s) trouvée(s).` + (inverses ? ' La clé et le secret étaient inversés : corrigé, pense à « Enregistrer ».' : '') };
                     } catch (e) {
                         testWL.value = { ok: false, message: '❌ ' + e.message };
                     }
                 };
                 const testerMeteoFrance = async () => {
-                    testMF.value = { ok: false, message: 'Test en cours…' };
-                    try {
-                        const p = parametresSaisie.value;
-                        const obs = await Meteo.meteoFranceObs(p.mfStation, p.mfApiKey);
-                        testMF.value = obs && obs.t !== null
-                            ? { ok: true, message: `✅ ${fmt(obs.t, 1)} °C à ${obs.date ? obs.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '?'}` }
-                            : { ok: false, message: '❌ Réponse reçue mais sans température : vérifie le n° de station.' };
-                    } catch (e) {
-                        testMF.value = { ok: false, message: '❌ ' + e.message };
-                    }
+                    const p = parametresSaisie.value;
+                    if (!p.mfApiKey) { testMF.value = { message: '❌ Saisis d\'abord la clé API.' }; return; }
+                    testMF.value = { message: 'Test en cours…' };
+                    const res = await Meteo.testerMeteoFrance(p.mfApiKey, p.mfStation);
+                    testMF.value = { message: '', obs: res.obs, clim: res.clim };
                 };
+                const apercuCle = (c) => Meteo.apercuCle(c);
                 const effacerClesAppareil = () => {
                     if (!confirm('Effacer les clés WeatherLink et Météo-France de cet appareil ?')) return;
                     reglagesMeteo.value = Meteo.effacerCles();
@@ -2268,6 +2269,264 @@ const initMap = () => {
                 const tempsIcone = (code) => Meteo.temps(code).icone;
                 const tempsTexte = (code) => Meteo.temps(code).texte;
                 const meteoIcone = computed(() => previsionsMeteo.value.length ? Meteo.temps(previsionsMeteo.value[0].code).icone : '🌡️');
+
+                // ==========================================
+                // === COMPARAISON DES CAMPAGNES          ===
+                // ==========================================
+                // Dates du projet : débétonisation à partir du 1er juillet 2025, revégétalisation à partir de septembre 2025
+                const DATE_DEBUT_TRAVAUX = '2025-07-01';
+                const DATE_REVEGETALISATION = '2025-09-01';
+                const phaseDe = (date) => {
+                    if (date < DATE_DEBUT_TRAVAUX) return { cle: 'avant', nom: 'Avant travaux', classe: 'bg-gray-200 text-gray-800' };
+                    if (date < DATE_REVEGETALISATION) return { cle: 'chantier', nom: 'Chantier', classe: 'bg-amber-100 text-amber-800' };
+                    return { cle: 'apres', nom: 'Après · ' + date.slice(0, 4), classe: 'bg-green-100 text-green-800' };
+                };
+                const PARAMS_TEMPERATURE = ['tSurface', 'tAir', 'wbgt', 'wb', 'hi', 'gt', 'dpt'];
+                const COULEURS_CAMPAGNES = ['#7c3aed', '#ea580c', '#2563eb', '#16a34a', '#db2777', '#0891b2', '#ca8a04', '#475569'];
+                const TIRETS = [[], [6, 3], [2, 3], [10, 4, 2, 4], [4, 4], [12, 3], [1, 2], [8, 2, 2, 2]];
+
+                const compFiltrePoint = ref('moyenne');
+                const compFiltreEtab = ref('Tous');
+                const compMode = ref('brut');
+                const selectionCampagnes = ref((() => { try { return JSON.parse(localStorage.getItem('comparaison_selection') || '[]'); } catch (e) { return []; } })());
+                const lireCacheMeteo = () => { try { return JSON.parse(localStorage.getItem('meteo_campagnes_v1') || '{}'); } catch (e) { return {}; } };
+                const meteoCampagnes = ref(lireCacheMeteo());
+                const meteoCampChargement = ref(false);
+                const meteoCampStatut = ref('');
+                const meteoCampErreur = ref(false);
+                const statsComparaison = ref([]);
+                const avertissementsComparaison = ref([]);
+                const paramTemperature = computed(() => PARAMS_TEMPERATURE.includes(compParam.value));
+
+                const cleMeteo = (date) => `${reglagesMeteo.value.mfStation}|${date}`;
+                const lignesMeteo = (date) => { const e = meteoCampagnes.value[cleMeteo(date)]; return e && e.rows ? e.rows : null; };
+
+                // Une campagne = un établissement + une date, regroupant mesures de surface et d'air
+                const campagnesListe = computed(() => {
+                    const map = new Map();
+                    for (const [type, liste] of [['surface', db.value.surface], ['air', db.value.air]]) {
+                        for (const m of liste) {
+                            if (!m.date || !m.etablissement) continue;
+                            const cle = m.etablissement + '|' + m.date;
+                            if (!map.has(cle)) map.set(cle, { cle, etablissement: m.etablissement, date: m.date, nbSurface: 0, nbAir: 0, heureMin: '', heureMax: '' });
+                            const c = map.get(cle);
+                            if (type === 'surface') c.nbSurface++; else c.nbAir++;
+                            if (m.heure) {
+                                if (!c.heureMin || m.heure < c.heureMin) c.heureMin = m.heure;
+                                if (!c.heureMax || m.heure > c.heureMax) c.heureMax = m.heure;
+                            }
+                        }
+                    }
+                    return [...map.values()].map(c => {
+                        const rows = lignesMeteo(c.date);
+                        const meteo = rows && rows.length ? Meteo.resumerCampagne(rows, c.date, c.heureMin, c.heureMax) : null;
+                        const valide = meteo && meteo.heures > 0;
+                        return { ...c, phase: phaseDe(c.date), meteo: valide ? meteo : null, meteoVide: !!rows && !valide };
+                    }).sort((a, b) => b.date.localeCompare(a.date) || a.etablissement.localeCompare(b.etablissement));
+                });
+                const campagnesFiltrees = computed(() => compFiltreEtab.value === 'Tous' ? campagnesListe.value : campagnesListe.value.filter(c => c.etablissement === compFiltreEtab.value));
+                const campagnesSelectionnees = computed(() => selectionCampagnes.value
+                    .map(k => campagnesListe.value.find(c => c.cle === k)).filter(Boolean)
+                    .sort((a, b) => a.date.localeCompare(b.date) || a.etablissement.localeCompare(b.etablissement)));
+
+                const estSelectionnee = (cle) => selectionCampagnes.value.includes(cle);
+                const sauverSelection = () => localStorage.setItem('comparaison_selection', JSON.stringify(selectionCampagnes.value));
+                const basculerSelection = (cle) => {
+                    if (estSelectionnee(cle)) {
+                        selectionCampagnes.value = selectionCampagnes.value.filter(k => k !== cle);
+                    } else {
+                        if (selectionCampagnes.value.length >= 8) { alert('8 campagnes au maximum pour garder un graphique lisible.'); return; }
+                        selectionCampagnes.value = [...selectionCampagnes.value, cle];
+                    }
+                    sauverSelection();
+                };
+                const formatDateCourte = (iso) => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
+                const etiquetteCourte = (c) => `${initiales(c.etablissement)} ${c.date.slice(8, 10)}/${c.date.slice(5, 7)}/${c.date.slice(2, 4)}`;
+                const classeScore = (s) => (s === null || s === undefined) ? 'bg-gray-50 text-gray-400'
+                    : (s >= 80 ? 'bg-green-100 text-green-800' : (s >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'));
+                const titreScore = (sc) => sc.details.map(d => `${d.nom} : écart ${fmt(d.ecart, d.unite === 'W/m²' ? 0 : 1)} ${d.unite}`).join('\n');
+
+                const matriceSelection = computed(() => {
+                    const campagnes = campagnesSelectionnees.value.filter(c => c.meteo);
+                    const lignes = campagnes.map(a => campagnes.map(b => {
+                        const sc = Meteo.scoreComparabilite(a.meteo, b.meteo);
+                        return sc ? { score: sc.score, titre: titreScore(sc) } : null;
+                    }));
+                    return { campagnes, lignes };
+                });
+
+                // Paires suggérées : avant travaux × après travaux dans la même école ; sinon toutes les paires de la même école
+                const pairesSuggerees = computed(() => {
+                    const res = [];
+                    const parEtab = {};
+                    for (const c of campagnesFiltrees.value) if (c.meteo) (parEtab[c.etablissement] = parEtab[c.etablissement] || []).push(c);
+                    let avantApres = false;
+                    for (const liste of Object.values(parEtab)) {
+                        const avant = liste.filter(c => c.phase.cle === 'avant');
+                        const apres = liste.filter(c => c.phase.cle === 'apres');
+                        if (!avant.length || !apres.length) continue;
+                        avantApres = true;
+                        for (const a of avant) for (const b of apres) {
+                            const sc = Meteo.scoreComparabilite(a.meteo, b.meteo);
+                            if (sc) res.push({ cle: a.cle + '~' + b.cle, a, b, score: sc.score, avantApres: true });
+                        }
+                    }
+                    if (!avantApres) {
+                        for (const liste of Object.values(parEtab)) {
+                            for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
+                                const sc = Meteo.scoreComparabilite(liste[i].meteo, liste[j].meteo);
+                                if (sc) res.push({ cle: liste[i].cle + '~' + liste[j].cle, a: liste[j], b: liste[i], score: sc.score, avantApres: false });
+                            }
+                        }
+                    }
+                    return res.sort((x, y) => y.score - x.score).slice(0, 8);
+                });
+                const pairesSuggereesTitre = computed(() => (pairesSuggerees.value.length && pairesSuggerees.value[0].avantApres)
+                    ? 'Meilleures paires avant / après travaux (même école)' : 'Meilleures paires de campagnes (même école)');
+
+                const comparerPaire = (p) => {
+                    selectionCampagnes.value = [p.a.cle, p.b.cle];
+                    sauverSelection();
+                    nextTick(() => { const el = document.getElementById('comparaisonChart'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+                };
+
+                const listePointsComparaison = computed(() => {
+                    const pts = new Set();
+                    for (const c of campagnesSelectionnees.value) {
+                        const etab = etablissementsData.value.find(e => e.nom === c.etablissement);
+                        if (etab) etab.points.forEach(p => pts.add(String(p.id)));
+                    }
+                    return [...pts].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+                });
+
+                // Météo Lille-Lesquin (DPClim horaire) de J-3 à J pour chaque date de campagne, gardée sur l'appareil
+                const chargerMeteoCampagnes = async (forcer) => {
+                    const cle = reglagesMeteo.value.mfApiKey;
+                    if (!cle) { meteoCampErreur.value = true; meteoCampStatut.value = 'Saisis la clé API Météo-France dans ☰ > Paramètres météo & clés.'; return; }
+                    if (!navigator.onLine) { meteoCampErreur.value = true; meteoCampStatut.value = 'Pas de réseau.'; return; }
+                    const aujourdHui = dateLocaleISO();
+                    const dates = [...new Set(campagnesFiltrees.value.map(c => c.date))]
+                        .filter(d => d < aujourdHui)
+                        .filter(d => forcer || !meteoCampagnes.value[cleMeteo(d)]);
+                    if (!dates.length) { meteoCampErreur.value = false; meteoCampStatut.value = 'La météo de toutes les campagnes passées est déjà chargée.'; return; }
+                    meteoCampChargement.value = true;
+                    meteoCampErreur.value = false;
+                    let ok = 0;
+                    try {
+                        for (const [i, d] of dates.entries()) {
+                            meteoCampStatut.value = `Commande Météo-France ${i + 1}/${dates.length} (${formatDateCourte(d)})…`;
+                            const f = Meteo.fenetreCampagne(d);
+                            const rows = await Meteo.dpclimHoraire(reglagesMeteo.value.mfStation, f.debut, f.fin, cle, (essai) => {
+                                if (essai > 0) meteoCampStatut.value = `Commande Météo-France ${i + 1}/${dates.length} (${formatDateCourte(d)}) : fichier en préparation…`;
+                            });
+                            const compactes = rows.map(r => ({ ts: r.ts, t: r.t, tn: r.tn, tx: r.tx, u: r.u, rr: r.rr, ff: r.ff, rafale: r.rafale, solar: r.solar, n: r.n }));
+                            meteoCampagnes.value = { ...meteoCampagnes.value, [cleMeteo(d)]: { rows: compactes, chargeLe: new Date().toISOString() } };
+                            try { localStorage.setItem('meteo_campagnes_v1', JSON.stringify(meteoCampagnes.value)); } catch (e) { console.warn('Cache météo plein', e); }
+                            ok++;
+                        }
+                        meteoCampStatut.value = `✅ Météo chargée pour ${ok} date(s).`;
+                    } catch (e) {
+                        meteoCampErreur.value = true;
+                        meteoCampStatut.value = (ok ? `${ok} date(s) chargée(s), puis erreur : ` : '') + e.message;
+                    } finally {
+                        meteoCampChargement.value = false;
+                    }
+                };
+
+                const minutesDe = (heure) => { const [h, m] = String(heure || '').split(':').map(Number); return isNaN(h) ? null : h * 60 + (m || 0); };
+                const formatMinutes = (v) => `${String(Math.floor(v / 60)).padStart(2, '0')}h${String(Math.round(v % 60)).padStart(2, '0')}`;
+
+                const updateComparaisonChart = () => {
+                    if (activeTab.value !== 'comparaison') return;
+                    nextTick(() => {
+                        if (comparaisonChartInstance) { comparaisonChartInstance.destroy(); comparaisonChartInstance = null; }
+                        const ctx = document.getElementById('comparaisonChart');
+                        const campagnes = campagnesSelectionnees.value;
+                        if (compMode.value === 'ecart' && !paramTemperature.value) compMode.value = 'brut';
+                        const type = compParam.value;
+                        const table = type === 'tSurface' ? 'surface' : 'air';
+                        const ecart = compMode.value === 'ecart';
+                        const filtre = compFiltrePoint.value;
+                        const datasets = [], stats = [], avert = [];
+                        const moyenneDe = (v) => v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+
+                        campagnes.forEach((c, ci) => {
+                            const couleur = COULEURS_CAMPAGNES[ci % COULEURS_CAMPAGNES.length];
+                            const rows = lignesMeteo(c.date);
+                            const nom = `${formatDateCourte(c.date)} · ${initiales(c.etablissement)} (${c.phase.nom})`;
+                            let mesures = db.value[table].filter(m => m.etablissement === c.etablissement && m.date === c.date
+                                && m[type] !== null && m[type] !== undefined && m[type] !== '' && minutesDe(m.heure) !== null);
+                            if (filtre !== 'moyenne' && filtre !== 'tous') mesures = mesures.filter(m => String(m.point) === String(filtre));
+                            if (!mesures.length) { avert.push(`${nom} : aucune mesure de ${getLabel(type)}${filtre !== 'moyenne' && filtre !== 'tous' ? ' au point ' + filtre : ''}.`); return; }
+
+                            let sansRef = 0;
+                            const ecarts = [];
+                            const pts = [];
+                            for (const m of mesures) {
+                                const v = parseFloat(m[type]);
+                                if (isNaN(v)) continue;
+                                const tRef = rows ? Meteo.temperatureA(rows, new Date(`${m.date}T${m.heure}:00`).getTime()) : null;
+                                if (tRef !== null && PARAMS_TEMPERATURE.includes(type)) ecarts.push(v - tRef);
+                                if (ecart && tRef === null) { sansRef++; continue; }
+                                pts.push({ x: minutesDe(m.heure), y: ecart ? v - tRef : v, point: String(m.point) });
+                            }
+                            if (sansRef) avert.push(`${nom} : ${sansRef} mesure(s) sans température de Lille-Lesquin (météo non chargée ?).`);
+
+                            if (filtre === 'moyenne') {
+                                const bins = {};
+                                pts.forEach(p => { const b = Math.floor(p.x / 30); (bins[b] = bins[b] || []).push(p.y); });
+                                const data = Object.keys(bins).map(Number).sort((a, b) => a - b).map(b => ({ x: b * 30 + 15, y: moyenneDe(bins[b]) }));
+                                datasets.push({ label: nom, data, borderColor: couleur, backgroundColor: couleur, borderWidth: 2.5, tension: 0.25, pointRadius: 3 });
+                            } else if (filtre === 'tous') {
+                                const parPoint = {};
+                                pts.forEach(p => (parPoint[p.point] = parPoint[p.point] || []).push(p));
+                                Object.keys(parPoint).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach((pt, pi) => {
+                                    datasets.push({ label: `${nom} · Pt ${pt}`, data: parPoint[pt].sort((a, b) => a.x - b.x), borderColor: couleur, backgroundColor: couleur,
+                                        borderDash: TIRETS[pi % TIRETS.length], borderWidth: 1.8, tension: 0.2, pointRadius: 2 });
+                                });
+                            } else {
+                                datasets.push({ label: nom, data: pts.sort((a, b) => a.x - b.x), borderColor: couleur, backgroundColor: couleur, borderWidth: 2.5, tension: 0.2, pointRadius: 3 });
+                            }
+
+                            const valeurs = pts.map(p => p.y);
+                            stats.push({
+                                cle: c.cle, nom, couleur, n: valeurs.length,
+                                moyenne: moyenneDe(valeurs),
+                                min: valeurs.length ? Math.min(...valeurs) : null,
+                                max: valeurs.length ? Math.max(...valeurs) : null,
+                                ecartMoyen: moyenneDe(ecarts)
+                            });
+                        });
+                        statsComparaison.value = stats;
+                        avertissementsComparaison.value = avert;
+
+                        const tousX = datasets.flatMap(d => d.data.map(p => p.x));
+                        if (!ctx || !tousX.length) return;
+                        const xMin = Math.floor(Math.min(...tousX) / 60) * 60;
+                        const xMax = Math.ceil(Math.max(...tousX) / 60) * 60;
+                        const unite = getUnit(type);
+                        comparaisonChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: { datasets },
+                            options: {
+                                responsive: true, maintainAspectRatio: false, spanGaps: true,
+                                interaction: { mode: 'nearest', intersect: false },
+                                scales: {
+                                    x: { type: 'linear', min: xMin, max: xMax === xMin ? xMin + 60 : xMax, ticks: { stepSize: 60, callback: (v) => formatMinutes(v) }, title: { display: true, text: 'Heure locale' } },
+                                    y: { title: { display: true, text: ecart ? `${getLabel(type)} − T air Lille-Lesquin (°C)` : `${getLabel(type)} (${unite})` } }
+                                },
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                                    tooltip: { callbacks: {
+                                        title: (items) => items.length ? formatMinutes(items[0].parsed.x) : '',
+                                        label: (it) => `${it.dataset.label} : ${ecart && it.parsed.y > 0 ? '+' : ''}${it.parsed.y.toFixed(1)} ${ecart ? '°C' : unite}`
+                                    } }
+                                }
+                            }
+                        });
+                    });
+                };
+                watch([campagnesSelectionnees, compParam, compFiltrePoint, compMode], () => updateComparaisonChart());
 
                 const fileInput = ref(null);
                 const triggerFileInput = () => { fileInput.value.click(); };
@@ -2401,7 +2660,11 @@ const initMap = () => {
                     openGestionEtablissements, sauvegarderEtablissements,
                     ajouterEtablissement, supprimerEtablissement,
                     ajouterPoint, supprimerPoint,getSurfaceName, showMapPicker, tempLat, tempLng, ouvrirSelecteurCarte,
-                    validerCoordonnees, fermerSelecteurCarte, geolocaliser, compParam, compA, compB, updateComparaisonChart, datesDisponiblesA, datesDisponiblesB, onCompAChange, onCompBChange,compFiltrePoint, listePointsComparaison,
+                    validerCoordonnees, fermerSelecteurCarte, geolocaliser, compParam, updateComparaisonChart, compFiltrePoint, listePointsComparaison,
+                    // Comparaison des campagnes
+                    compFiltreEtab, compMode, selectionCampagnes, campagnesFiltrees, estSelectionnee, basculerSelection,
+                    formatDateCourte, etiquetteCourte, classeScore, matriceSelection, pairesSuggerees, pairesSuggereesTitre, comparerPaire,
+                    chargerMeteoCampagnes, meteoCampChargement, meteoCampStatut, meteoCampErreur, statsComparaison, avertissementsComparaison, paramTemperature,
                     // Carte
                     carteType, carteHeure, animationActive, pointsAvecDonnees,
                     getColorForValue, updateCarte, initMap, toggleAnimation,
@@ -2417,7 +2680,7 @@ const initMap = () => {
                     stationsDisponibles, stationActive, meteoActuelle, previsionsMeteo, meteoErreur, meteoChargement, meteoIcone,
                     relaisParDefaut, actualiserMeteo, deplierBandeau, basculerBandeau, choisirStation,
                     ouvrirParametresMeteo, enregistrerParametresMeteo, testerWeatherLink, testerMeteoFrance, effacerClesAppareil,
-                    fmt, directionTexte, tempsIcone, tempsTexte
+                    fmt, directionTexte, tempsIcone, tempsTexte, apercuCle
                 };
             }
         }).mount('#app');
